@@ -1,2 +1,2 @@
 # go-rpg
-Go REST/Postgres webservice builder
+Go REST/Postgres webservice kit
