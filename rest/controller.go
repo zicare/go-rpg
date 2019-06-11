@@ -16,8 +16,6 @@ type Controller struct{}
 //Get exported
 func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 
-	//c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-
 	var (
 		pIDs = ParamIDs(c, m)
 		err  = db.Find(m, pIDs)
@@ -40,8 +38,6 @@ func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 
 //Index exported
 func (ctrl Controller) Index(c *gin.Context, m db.Model) {
-
-	//c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	var (
 		opt             = params(c, m)
@@ -73,8 +69,6 @@ func (ctrl Controller) Index(c *gin.Context, m db.Model) {
 //IndexHead exported
 func (ctrl Controller) IndexHead(c *gin.Context, m db.Model) {
 
-	//c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-
 	var (
 		opt             = params(c, m)
 		meta, data, err = db.FetchAll(m, opt)
@@ -101,9 +95,7 @@ func (ctrl Controller) IndexHead(c *gin.Context, m db.Model) {
 //POST exported
 func (ctrl Controller) POST(c *gin.Context, m db.Model) {
 
-	//c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-	if err := c.Bind(m); err != nil {
+	if err := c.ShouldBind(m); err != nil {
 		/*
 		 * payload isn't correct
 		 */
@@ -139,8 +131,6 @@ func (ctrl Controller) POST(c *gin.Context, m db.Model) {
 //PUT exported
 func (ctrl Controller) PUT(c *gin.Context, m db.Model) {
 
-	//c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-
 	pIDs := ParamIDs(c, m)
 
 	if err := db.Find(m.New(), pIDs); err != nil {
@@ -151,7 +141,7 @@ func (ctrl Controller) PUT(c *gin.Context, m db.Model) {
 			http.StatusNotFound,
 			gin.H{"message": "Not found!"},
 		)
-	} else if err := c.Bind(m); err != nil {
+	} else if err := c.ShouldBind(m); err != nil {
 		/*
 		 * payload isn't correct
 		 */
