@@ -1,6 +1,8 @@
 package acl
 
 import (
+	"errors"
+	"reflect"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -18,9 +20,12 @@ type Grant struct {
 }
 
 //Init exported
-func Init() (err error) {
+func Init(m db.Model) (err error) {
 
 	var (
+		f [5]string
+		t = reflect.Indirect(reflect.ValueOf(m))
+
 		g Grant
 
 		role   int64
@@ -33,11 +38,36 @@ func Init() (err error) {
 		sb  = sqlbuilder.PostgreSQL.NewSelectBuilder()
 	)
 
-	sb.From("view_lnk_routes_roles")
-	sb.Select("role_id", "route", "method", "system_access_from", "system_access_to")
+	for i := 0; i < t.NumField(); i++ {
+		if tag, ok := t.Type().Field(i).Tag.Lookup("acl"); ok {
+			if col, ok := t.Type().Field(i).Tag.Lookup("db"); ok {
+				switch tag {
+				case "role":
+					f[0] = col
+				case "route":
+					f[1] = col
+				case "method":
+					f[2] = col
+				case "from":
+					f[3] = col
+				case "to":
+					f[4] = col
+				}
+			}
+		}
+	}
+
+	for _, col := range f {
+		if col == "" {
+			return errors.New(("ACL tags are not properly set"))
+		}
+	}
+
+	sb.From(m.Table())
+	sb.Select(f[0], f[1], f[2], f[3], f[4])
 	sb.Where(
-		sb.LessThan("system_access_from", now),
-		sb.GreaterThan("system_access_to", now),
+		sb.LessThan(f[3], now),
+		sb.GreaterThan(f[4], now),
 	)
 
 	sql, args := sb.Build()
