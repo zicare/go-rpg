@@ -17,6 +17,8 @@ type SelectOpt struct {
 	Limit    int
 	Column   []string
 	Filter   map[string][]lib.Pair
+	Null     []string
+	NotNull  []string
 	Order    []string
 	Checksum int
 }

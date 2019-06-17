@@ -54,6 +54,34 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 		}
 	}
 
+	//null
+	opts.Null = []string{}
+	if i, ok := param["null"]; ok {
+		colsAux := make(map[string]string)
+		for _, v := range strings.Split(i[0], ",") {
+			colsAux[v] = v
+		}
+		for _, k := range colsOrdered {
+			if _, ok := colsAux[k]; ok {
+				opts.Null = append(opts.Null, k)
+			}
+		}
+	}
+
+	//not null
+	opts.NotNull = []string{}
+	if i, ok := param["notnull"]; ok {
+		colsAux := make(map[string]string)
+		for _, v := range strings.Split(i[0], ",") {
+			colsAux[v] = v
+		}
+		for _, k := range colsOrdered {
+			if _, ok := colsAux[k]; ok {
+				opts.NotNull = append(opts.NotNull, k)
+			}
+		}
+	}
+
 	//column
 	opts.Column = []string{}
 	i, ok := param["cols"]
