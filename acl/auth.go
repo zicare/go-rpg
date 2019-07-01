@@ -1,7 +1,6 @@
 package acl
 
 import (
-	"log"
 	"strings"
 	"time"
 
@@ -72,11 +71,11 @@ func BasicAuth(m User) gin.HandlerFunc {
 		case nil:
 			//log.Println("pwd okay")
 		case bcrypt.ErrMismatchedHashAndPassword:
-			log.Println("Invalid password")
+			//log.Println("Invalid password")
 			abort(c, 401, "Invalid credentials")
 			return
 		default:
-			log.Println("Something went wrong")
+			//log.Println("Something went wrong")
 			abort(c, 500, "Something went wrong verifying your credentials")
 			return
 		}

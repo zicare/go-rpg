@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -65,7 +64,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 	//get total count
 	sb.Select(sb.As("COUNT(*)", "t"))
 	sql, args := sb.Build()
-	log.Println(sql, args)
+	//log.Println(sql, args)
 	err := db.QueryRow(sql, args...).Scan(&total)
 	if err != nil {
 		return meta, results, err
@@ -84,7 +83,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 
 	//buils sql and execute it
 	sql, args = sb.Build()
-	log.Println(sql, args)
+	//log.Println(sql, args)
 	rows, err := db.Query(sql, args...)
 	defer rows.Close()
 
