@@ -92,6 +92,8 @@ func Init() (err error) {
 		return
 	}
 
+	db.SetMaxOpenConns(c.GetInt("max_open_conns"))
+
 	return
 }
 
