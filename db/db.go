@@ -92,7 +92,7 @@ func Init() (err error) {
 		return
 	}
 
-	db.SetMaxOpenConns(c.GetInt("max_open_conns"))
+	db.SetMaxOpenConns(c.GetInt("db.max_open_conns"))
 
 	return
 }
