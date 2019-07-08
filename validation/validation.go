@@ -60,6 +60,7 @@ type Message struct {
 //Struct exported
 func Struct(m db.Model) error {
 
+	validate.RegisterStructValidation(m.StructLevelValidation, m.Val())
 	if ve := validate.Struct(m); ve != nil {
 		return GetMessages(ve)
 	}
