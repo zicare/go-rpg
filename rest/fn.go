@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
@@ -12,19 +13,22 @@ import (
 )
 
 //ParamIDs exported
-func ParamIDs(c *gin.Context, m db.Model) (mIDs []lib.Pair) {
+func ParamIDs(c *gin.Context, m db.Model) (mIDs []lib.Pair, err error) {
 
 	var (
 		pkParam      = strings.Split(c.Param("id"), ",")
 		_, _, pkCols = db.Cols(m)
 	)
 
+	if len(pkParam) != len(pkCols) {
+		err = errors.New("Composite key missuse")
+		return
+	}
+
 	//mIDs
 	mIDs = []lib.Pair{}
 	for i, k := range pkCols {
-		if len(pkParam) > i {
-			mIDs = append(mIDs, lib.Pair{A: k, B: pkParam[i]})
-		}
+		mIDs = append(mIDs, lib.Pair{A: k, B: pkParam[i]})
 	}
 	return
 }

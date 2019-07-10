@@ -8,6 +8,7 @@ import (
 	"github.com/zicare/go-rpg/db"
 	"github.com/zicare/go-rpg/lib"
 	"github.com/zicare/go-rpg/validation"
+	"gopkg.in/go-playground/validator.v8"
 )
 
 //Controller exported
@@ -16,12 +17,15 @@ type Controller struct{}
 //Get exported
 func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 
-	var (
-		pIDs = ParamIDs(c, m)
-		err  = db.Find(m, pIDs)
-	)
-
-	if err == sql.ErrNoRows {
+	if pIDs, err := ParamIDs(c, m); err != nil {
+		/*
+		 * composite key missuse
+		 */
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{"message": err.Error()},
+		)
+	} else if err = db.Find(m, pIDs); err == sql.ErrNoRows {
 		c.JSON(
 			http.StatusNotFound,
 			gin.H{"message": "Not found!"},
@@ -99,17 +103,27 @@ func (ctrl Controller) POST(c *gin.Context, m db.Model) {
 		/*
 		 * payload isn't correct
 		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"errors": validation.GetMessages(err)},
-		)
+		switch err.(type) {
+		case validator.ValidationErrors:
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": "There are validation errors",
+					"errors": validation.GetMessages(err)},
+			)
+		default:
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": "Malformed payload"},
+			)
+		}
 	} else if err := m.FilterInput([]lib.Pair{}); err != nil {
 		/*
 		 * payload isn't correct
 		 */
 		c.JSON(
 			http.StatusBadRequest,
-			gin.H{"errors": err},
+			gin.H{"message": "There are validation errors",
+				"errors": err},
 		)
 	} else if err := db.Insert(m); err != nil {
 		/*
@@ -131,9 +145,15 @@ func (ctrl Controller) POST(c *gin.Context, m db.Model) {
 //PUT exported
 func (ctrl Controller) PUT(c *gin.Context, m db.Model) {
 
-	pIDs := ParamIDs(c, m)
-
-	if err := db.Find(m.New(), pIDs); err != nil {
+	if pIDs, err := ParamIDs(c, m); err != nil {
+		/*
+		 * pIDs count didn't match table's primary key count
+		 */
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{"message": err.Error()},
+		)
+	} else if err := db.Find(m.New(), pIDs); err != nil {
 		/*
 		 * requested resource doesn't exist
 		 */
@@ -145,17 +165,27 @@ func (ctrl Controller) PUT(c *gin.Context, m db.Model) {
 		/*
 		 * payload isn't correct
 		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"errors": validation.GetMessages(err)},
-		)
+		switch err.(type) {
+		case validator.ValidationErrors:
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": "There are validation errors",
+					"errors": validation.GetMessages(err)},
+			)
+		default:
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": err.Error()},
+			)
+		}
 	} else if err := m.FilterInput(pIDs); err != nil {
 		/*
 		 * payload isn't correct
 		 */
 		c.JSON(
 			http.StatusBadRequest,
-			gin.H{"errors": err},
+			gin.H{"message": "There are validation errors",
+				"errors": err},
 		)
 	} else if err := db.Update(m, pIDs); err == sql.ErrNoRows {
 		/*

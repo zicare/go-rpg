@@ -123,10 +123,11 @@ func Find(m Model, id []lib.Pair) error {
 	)
 
 	for _, p := range id {
-		sb.Where(sb.Equal(p.A.(string), p.B.(string)))
+		sb.Where(sb.Equal(p.A.(string), fmt.Sprintf("%v", p.B)))
 	}
 
-	sql, args := sb.Build() //;log.Println(sql, args)
+	sql, args := sb.Build()
+	//log.Println(sql, args)
 	return db.QueryRow(sql, args...).Scan(modelStruct.Addr(&m)...)
 }
 
@@ -142,7 +143,7 @@ func Insert(m Model) error {
 
 	var v []interface{}
 	for _, c := range orderedCols {
-		if slice.Contains(pk, c) {
+		if slice.Contains(pk, c) && cols[c] == nil {
 			v = append(v, sqlbuilder.Raw("DEFAULT"))
 		} else {
 			v = append(v, cols[c])
@@ -151,7 +152,8 @@ func Insert(m Model) error {
 
 	ib.InsertInto(table)
 	ib.Values(v...)
-	sql, args := ib.Build() //;log.Println(sql, args)
+	sql, args := ib.Build()
+	//log.Println(sql, args)
 	return db.QueryRow(sql+" RETURNING *", args...).Scan(ms.Addr(&m)...)
 }
 
@@ -168,7 +170,7 @@ func Update(m Model, id []lib.Pair) error {
 	ub.Update(table)
 
 	for _, p := range id {
-		ub.Where(ub.Equal(p.A.(string), p.B.(string)))
+		ub.Where(ub.Equal(p.A.(string), fmt.Sprintf("%v", p.B)))
 		_, ok := cols[p.A.(string)]
 		if ok {
 			delete(cols, p.A.(string))
