@@ -14,32 +14,6 @@ import (
 //Controller exported
 type Controller struct{}
 
-//Get exported
-func (ctrl Controller) Get(c *gin.Context, m db.Model) {
-
-	if pIDs, err := ParamIDs(c, m); err != nil {
-		/*
-		 * composite key missuse
-		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"message": err.Error()},
-		)
-	} else if err = db.Find(m, pIDs); err == sql.ErrNoRows {
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{"message": "Not found!"},
-		)
-	} else if err != nil {
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{"message": err.Error()},
-		)
-	} else {
-		c.JSON(http.StatusOK, m.Xfrm())
-	}
-}
-
 //Index exported
 func (ctrl Controller) Index(c *gin.Context, m db.Model) {
 
@@ -96,8 +70,34 @@ func (ctrl Controller) IndexHead(c *gin.Context, m db.Model) {
 
 }
 
-//POST exported
-func (ctrl Controller) POST(c *gin.Context, m db.Model) {
+//Get exported
+func (ctrl Controller) Get(c *gin.Context, m db.Model) {
+
+	if pIDs, err := ParamIDs(c, m); err != nil {
+		/*
+		 * composite key missuse
+		 */
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{"message": err.Error()},
+		)
+	} else if err = db.Find(m, pIDs); err == sql.ErrNoRows {
+		c.JSON(
+			http.StatusNotFound,
+			gin.H{"message": "Not found!"},
+		)
+	} else if err != nil {
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{"message": err.Error()},
+		)
+	} else {
+		c.JSON(http.StatusOK, m.Xfrm())
+	}
+}
+
+//Post exported
+func (ctrl Controller) Post(c *gin.Context, m db.Model) {
 
 	if err := c.ShouldBind(m); err != nil {
 		/*
@@ -142,8 +142,8 @@ func (ctrl Controller) POST(c *gin.Context, m db.Model) {
 	}
 }
 
-//PUT exported
-func (ctrl Controller) PUT(c *gin.Context, m db.Model) {
+//Put exported
+func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 
 	if pIDs, err := ParamIDs(c, m); err != nil {
 		/*

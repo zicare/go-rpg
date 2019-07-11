@@ -123,7 +123,7 @@ func Find(m Model, id []lib.Pair) error {
 	)
 
 	for _, p := range id {
-		sb.Where(sb.Equal(p.A.(string), fmt.Sprintf("%v", p.B)))
+		sb.Where(sb.Equal(p.A.(string), p.B.(string)))
 	}
 
 	sql, args := sb.Build()
@@ -170,7 +170,7 @@ func Update(m Model, id []lib.Pair) error {
 	ub.Update(table)
 
 	for _, p := range id {
-		ub.Where(ub.Equal(p.A.(string), fmt.Sprintf("%v", p.B)))
+		ub.Where(ub.Equal(p.A.(string), p.B.(string)))
 		_, ok := cols[p.A.(string)]
 		if ok {
 			delete(cols, p.A.(string))
