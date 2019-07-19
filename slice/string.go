@@ -9,3 +9,14 @@ func Contains(s []string, e string) bool {
 	}
 	return false
 }
+
+//Diff exported
+func Diff(a []string, b []string) []string {
+	var c []string
+	for _, e := range a {
+		if !Contains(b, e) {
+			c = append(c, e)
+		}
+	}
+	return c
+}

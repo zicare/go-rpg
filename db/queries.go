@@ -20,7 +20,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 		meta        = ResultSetMeta{Range: "*/*", Checksum: "*"}
 		total       string
 		results     []interface{}
-		table       = m.Table()
+		table       = m.View()
 		modelStruct = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
 		sb          = modelStruct.SelectFrom(table)
 
@@ -64,7 +64,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 	//get total count
 	sb.Select(sb.As("COUNT(*)", "t"))
 	sql, args := sb.Build()
-	//log.Println(sql, args)
+	//fmt.Println(sql, args)
 	err := db.QueryRow(sql, args...).Scan(&total)
 	if err != nil {
 		return meta, results, err
@@ -83,7 +83,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 
 	//buils sql and execute it
 	sql, args = sb.Build()
-	//log.Println(sql, args)
+	//fmt.Println(sql, args)
 	rows, err := db.Query(sql, args...)
 	defer rows.Close()
 
@@ -117,7 +117,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 func Find(m Model, id []lib.Pair) error {
 
 	var (
-		table       = m.Table()
+		table       = m.View()
 		modelStruct = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
 		sb          = modelStruct.SelectFrom(table)
 	)
@@ -135,56 +135,62 @@ func Find(m Model, id []lib.Pair) error {
 func Insert(m Model) error {
 
 	var (
-		table                 = m.Table()
-		cols, orderedCols, pk = Cols(m)
-		ms                    = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
-		ib                    = sqlbuilder.PostgreSQL.NewInsertBuilder()
+		err         error
+		table       = m.Table()
+		fields, val = Fields(m)
+		ms          = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
+		ib          = sqlbuilder.PostgreSQL.NewInsertBuilder()
 	)
 
 	var v []interface{}
-	for _, c := range orderedCols {
-		if slice.Contains(pk, c) && cols[c] == nil {
+	for _, c := range fields.Ordered {
+		if slice.Contains(fields.Primary, c) && slice.Contains(fields.Serial, c) {
 			v = append(v, sqlbuilder.Raw("DEFAULT"))
-		} else {
-			v = append(v, cols[c])
+		} else if !slice.Contains(fields.View, c) {
+			v = append(v, val[c])
 		}
 	}
 
 	ib.InsertInto(table)
 	ib.Values(v...)
 	sql, args := ib.Build()
-	//log.Println(sql, args)
-	return db.QueryRow(sql+" RETURNING *", args...).Scan(ms.Addr(&m)...)
+	//fmt.Println(sql, args)
+	if err = db.QueryRow(sql+" RETURNING *", args...).
+		Scan(ms.AddrWithCols(fields.Writable, &m)...); err == nil {
+		return Find(m, PID(m, fields.Primary))
+	}
+	return err
 }
 
 //Update exported
 func Update(m Model, id []lib.Pair) error {
 
 	var (
-		table      = m.Table()
-		cols, _, _ = Cols(m)
-		ms         = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
-		ub         = sqlbuilder.PostgreSQL.NewUpdateBuilder()
+		table       = m.Table()
+		fields, val = Fields(m)
+		ms          = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
+		ub          = sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	)
 
 	ub.Update(table)
 
 	for _, p := range id {
 		ub.Where(ub.Equal(p.A.(string), p.B.(string)))
-		_, ok := cols[p.A.(string)]
+		_, ok := val[p.A.(string)]
 		if ok {
-			delete(cols, p.A.(string))
+			delete(val, p.A.(string))
 		}
 	}
 
 	var asg []string
-	for k, v := range cols {
-		if !reflect.ValueOf(v).IsNil() {
+	for k, v := range val {
+		if !reflect.ValueOf(v).IsNil() && slice.Contains(fields.Writable, k) {
 			asg = append(asg, ub.Assign(k, v))
 		}
 	}
 	ub.Set(asg...)
 
 	sql, args := ub.Build() //;log.Println(sql, args)
-	return db.QueryRow(sql+" RETURNING *", args...).Scan(ms.Addr(&m)...)
+	db.QueryRow(sql+" RETURNING *", args...).Scan(ms.AddrWithCols(fields.Writable, &m)...)
+	return Find(m, PID(m, fields.Primary))
 }

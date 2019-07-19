@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/gin-gonic/gin"
+
 	//required
 	_ "github.com/lib/pq"
 	"github.com/zicare/go-rpg/config"
@@ -34,10 +36,11 @@ type ResultSetMeta struct {
 type Model interface {
 	New() Model
 	Table() string
+	View() string
 	Val() interface{}
 	Xfrm() Model
-	FilterInput(pIDs []lib.Pair) error
-	StructLevelValidation(*validator.Validate, *validator.StructLevel)
+	Bind(*gin.Context, []lib.Pair) error
+	Validation(*validator.Validate, *validator.StructLevel)
 }
 
 /*
@@ -57,6 +60,10 @@ type Model interface {
  *   return "persons"
  * }
  *
+ * func (*Person) View() string {
+ *   return "view_persons"
+ * }
+ *
  * func (person *Person) Val() interface{} {
  * 	return *person
  * }
@@ -66,34 +73,77 @@ type Model interface {
  * 	return person
  * }
  *
- * func (person *Person) FilterInput(pIDs []lib.Pair) error { //make changes to submitted person before struct level validation on POST/PUT requests
+ * func (person *Person) Bind(c *gin.Context, pIDs []lib.Pair) error {
  *
- * 	 if len(pIDs) > 0 {
- * 		id, _ := strconv.ParseInt(pIDs[0].B.(string), 10, 64)
- * 		person.PersonID = &id
- * 	 } else {
- * 		id := int64(0)
- * 		person.PersonID = &id
- * 	 }
- *
- * 	 return validation.Struct(person)
+ * 	if err := c.ShouldBind(person); err != nil {
+ * 		return err
+ * 	} else if len(pIDs) == 1 {
+ * 		person.PersonID, _ = strconv.ParseInt(pIDs[0].B.(string), 10, 64)
+ * 	}
+ * 	person.LastEditTs, person.LastEditUserID = auth.TsAndUserID()
+ * 	return validation.Struct(person)
  * }
  *
- * func (*Person) StructLevelValidation(v *validator.Validate, structLevel *validator.StructLevel) { //make final struct level validation before trying to persist person to db
+ * func (*Person) Validation(v *validator.Validate, sl *validator.StructLevel) { //make final struct level validation before trying to persist person to db
  *
- * 	person := structLevel.CurrentStruct.Interface().(Person)
+ * 	person := sl.CurrentStruct.Interface().(Person)
  *
  * 	if person.FirstName == nil && person.LastName == nil {
- * 		structLevel.ReportError(reflect.ValueOf(person.FirstName), "FirstName", "first_name", "FirstNameOrLastName")
- * 		structLevel.ReportError(reflect.ValueOf(person.LastName), "LastName", "last_name", "FirstNameOrLastName")
+ * 		sl.ReportError(reflect.ValueOf(person.FirstName), "FirstName", "first_name", "FirstNameOrLastName")
+ * 		sl.ReportError(reflect.ValueOf(person.LastName), "LastName", "last_name", "FirstNameOrLastName")
  * 	}
  *
  * }
  *
  */
 
+//Meta exported
+type Meta struct {
+	Ordered  []string
+	Primary  []string
+	Serial   []string
+	View     []string
+	Writable []string
+}
+
+//Fields exported
+func Fields(m Model) (meta Meta, val map[string]interface{}) {
+
+	var (
+		v = reflect.ValueOf(m.Val())
+		t = reflect.Indirect(v)
+	)
+
+	val = make(map[string]interface{})
+
+	for i := 0; i < t.NumField(); i++ {
+		k, ok := t.Type().Field(i).Tag.Lookup("db")
+		if ok && k != "-" {
+			val[k] = v.Field(i).Interface()
+			meta.Ordered = append(meta.Ordered, k)
+			//check for primary
+			if primary, _ := t.Type().Field(i).Tag.Lookup("primary"); primary == "1" {
+				meta.Primary = append(meta.Primary, k)
+				//pID = append(pID, lib.Pair{A: k, B: fmt.Sprintf("%v", val[k])})
+			}
+			//check for serial
+			if serial, _ := t.Type().Field(i).Tag.Lookup("serial"); serial == "1" {
+				meta.Serial = append(meta.Serial, k)
+			}
+			//check for view or writable
+			if view, ok := t.Type().Field(i).Tag.Lookup("view"); !ok {
+				meta.Writable = append(meta.Writable, k)
+			} else if view == "1" {
+				meta.View = append(meta.View, k)
+			}
+		}
+	}
+	return
+}
+
+/*
 //Cols exported
-func Cols(m Model) (cols map[string]interface{}, colsOrdered []string, pk []string) {
+func Cols(m Model) (cols map[string]interface{}, colsOrdered []string, pk []string, sk []string, vw []string) {
 
 	var (
 		v = reflect.ValueOf(m.Val())
@@ -103,6 +153,8 @@ func Cols(m Model) (cols map[string]interface{}, colsOrdered []string, pk []stri
 	cols = make(map[string]interface{})
 	colsOrdered = []string{}
 	pk = []string{}
+	sk = []string{}
+	vw = []string{}
 
 	for i := 0; i < t.NumField(); i++ {
 		k, ok := t.Type().Field(i).Tag.Lookup("db")
@@ -113,11 +165,20 @@ func Cols(m Model) (cols map[string]interface{}, colsOrdered []string, pk []stri
 			if p == "1" {
 				pk = append(pk, k)
 			}
+			s, _ := t.Type().Field(i).Tag.Lookup("serial")
+			if s == "1" {
+				sk = append(sk, k)
+			}
+			w, _ := t.Type().Field(i).Tag.Lookup("view")
+			if w == "1" {
+				vw = append(vw, k)
+			}
 		}
 	}
 
 	return
 }
+*/
 
 var db *sql.DB
 
@@ -155,4 +216,40 @@ func Init() (err error) {
 func Db() *sql.DB {
 
 	return db
+}
+
+//PID exported
+func PID(m Model, f []string) (pID []lib.Pair) {
+
+	var (
+		v = reflect.ValueOf(m.Val())
+		t = reflect.Indirect(v)
+	)
+
+	for i := 0; i < t.NumField(); i++ {
+		k, ok := t.Type().Field(i).Tag.Lookup("primary")
+		if ok && k == "1" {
+			c, _ := t.Type().Field(i).Tag.Lookup("db")
+			pID = append(pID, lib.Pair{A: c, B: fmt.Sprintf("%v", v.Field(i).Interface())})
+		}
+	}
+	return
+}
+
+//TAG exported
+func TAG(m Model, tag string) (out map[string]string) {
+
+	var (
+		v = reflect.ValueOf(m.Val())
+		t = reflect.Indirect(v)
+	)
+
+	out = make(map[string]string)
+
+	for i := 0; i < t.NumField(); i++ {
+		if k, ok := t.Type().Field(i).Tag.Lookup(tag); ok {
+			out[t.Type().Field(i).Name] = k
+		}
+	}
+	return
 }

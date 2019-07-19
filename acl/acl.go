@@ -63,7 +63,7 @@ func Init(m db.Model) (err error) {
 		}
 	}
 
-	sb.From(m.Table())
+	sb.From(m.View())
 	sb.Select(f[0], f[1], f[2], f[3], f[4])
 	sb.Where(
 		sb.LessThan(f[3], now),

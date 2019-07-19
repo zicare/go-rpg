@@ -42,7 +42,7 @@ func Init() error {
 //register custom validations
 func register(v *validator.Validate) error {
 
-	if err := v.RegisterValidation("serial", Serial); err != nil {
+	if err := v.RegisterValidation("auto", Auto); err != nil {
 		return err
 	}
 	if err := v.RegisterValidation("unique", Unique); err != nil {
@@ -63,9 +63,10 @@ type Message struct {
 //Struct exported
 func Struct(m db.Model) error {
 
-	validate.RegisterStructValidation(m.StructLevelValidation, m.Val())
+	validate.RegisterStructValidation(m.Validation, m.Val())
 	if ve := validate.Struct(m); ve != nil {
-		return GetMessages(ve)
+		return ve
+		//return GetMessages(ve)
 	}
 	return nil
 }
@@ -81,13 +82,32 @@ func (em ErrorMessages) Error() string {
 }
 
 //GetMessages exported
-func GetMessages(err error) ErrorMessages {
+func GetMessages(err error, m db.Model) ErrorMessages {
 
-	var em ErrorMessages
-	for k, v := range err.(validator.ValidationErrors) {
+	var (
+		f     = db.TAG(m, "json")
+		em    ErrorMessages
+		field string
+		ok    bool
+	)
+
+	for _, v := range err.(validator.ValidationErrors) {
+		if field, ok = f[v.Field]; !ok {
+			field = v.Field
+		}
 		em = append(em, Message{
-			Key: k,
+			Key: field,
 			Msg: fmt.Sprintf("Value %v didn't pass %s(%s) validation", v.Value, v.Tag, v.Param)})
 	}
+
 	return em
+}
+
+//ValError exported
+func ValError(key string, field string, value interface{}, tag string, param string) validator.ValidationErrors {
+	var ve validator.ValidationErrors
+	ve = make(map[string]*validator.FieldError)
+	fe := validator.FieldError{Value: value, Tag: tag, Param: param, Field: field}
+	ve[key] = &fe
+	return ve
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/zicare/go-rpg/jwt"
 )
 
+var auth jwt.Payload
+
 //User interface exported
 type User interface {
 	db.Model
@@ -37,22 +39,22 @@ func BasicAuth(m User) gin.HandlerFunc {
 		}
 
 		var (
-			now        = time.Now()
-			table      = m.Table()
-			_, cols, _ = db.Cols(m)
-			ms         = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
-			sb         = ms.SelectFrom(table)
-			pepper     = config.Config().GetString("pepper")
+			now       = time.Now()
+			table     = m.View()
+			fields, _ = db.Fields(m)
+			ms        = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
+			sb        = ms.SelectFrom(table)
+			pepper    = config.Config().GetString("pepper")
 		)
 
-		sb.Select(cols...)
+		sb.Select(fields.Ordered...)
 		sb.Where(
 			sb.Equal("email", email),
 			//sb.Equal("password", password),
 		)
 
 		sql, args := sb.Build()
-		//log.Println(sql, args)
+		//fmt.Println(sql, args)
 		err := db.Db().QueryRow(sql, args...).Scan(ms.Addr(&m)...)
 		if err != nil {
 			//email not registered
@@ -63,13 +65,13 @@ func BasicAuth(m User) gin.HandlerFunc {
 		//pwd creation
 		//hashedBytes, _ := bcrypt.GenerateFromPassword([]byte(password+pepper), bcrypt.DefaultCost)
 		//hpwd := string(hashedBytes)
-		//log.Println(hpwd)
+		//fmt.Println(hpwd)
 
 		//err = bcrypt.CompareHashAndPassword([]byte(*m.Password), []byte(password+pepper))
 		err = bcrypt.CompareHashAndPassword(m.GetPassword(), []byte(password+pepper))
 		switch err {
 		case nil:
-			//log.Println("pwd okay")
+			//fmt.Println("pwd okay")
 		case bcrypt.ErrMismatchedHashAndPassword:
 			//log.Println("Invalid password")
 			abort(c, 401, "Invalid credentials")
@@ -106,7 +108,8 @@ func Auth(route string) gin.HandlerFunc {
 			return
 		}
 
-		auth, err := jwt.Auth(token[1], secret)
+		var err error
+		auth, err = jwt.Auth(token[1], secret)
 		if err != nil {
 			abort(c, 401, err.Error())
 			return
@@ -131,6 +134,11 @@ func Auth(route string) gin.HandlerFunc {
 	}
 }
 
+//Token exported
+func Token() jwt.Payload {
+	return auth
+}
+
 func abort(c *gin.Context, code int, msg string) {
 
 	c.JSON(
@@ -138,4 +146,15 @@ func abort(c *gin.Context, code int, msg string) {
 		gin.H{"message": msg},
 	)
 	c.Abort()
+}
+
+//TsAndUserID exported
+func TsAndUserID() (*time.Time, *int64) {
+
+	var (
+		ts  = time.Now()
+		uid = auth.UserID
+	)
+
+	return &ts, &uid
 }

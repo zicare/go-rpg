@@ -16,18 +16,18 @@ import (
 func ParamIDs(c *gin.Context, m db.Model) (mIDs []lib.Pair, err error) {
 
 	var (
-		pkParam      = strings.Split(c.Param("id"), ",")
-		_, _, pkCols = db.Cols(m)
+		pkParam   = strings.Split(c.Param("id"), ",")
+		fields, _ = db.Fields(m)
 	)
 
-	if len(pkParam) != len(pkCols) {
+	if len(pkParam) != len(fields.Primary) {
 		err = errors.New("Composite key missuse")
 		return
 	}
 
 	//mIDs
 	mIDs = []lib.Pair{}
-	for i, k := range pkCols {
+	for i, k := range fields.Primary {
 		mIDs = append(mIDs, lib.Pair{A: k, B: pkParam[i]})
 	}
 	return
@@ -36,9 +36,9 @@ func ParamIDs(c *gin.Context, m db.Model) (mIDs []lib.Pair, err error) {
 func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 
 	var (
-		cf                   = [5]string{"eq", "gt", "st", "gteq", "steq"}
-		cols, colsOrdered, _ = db.Cols(m)
-		param                = c.Request.URL.Query()
+		cf          = [5]string{"eq", "gt", "st", "gteq", "steq"}
+		fields, val = db.Fields(m)
+		param       = c.Request.URL.Query()
 	)
 
 	//filter
@@ -50,7 +50,7 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 			j := strings.Split(i[0], ";")
 			for _, k := range j {
 				j := strings.Split(k, "|")
-				_, ok := cols[j[0]]
+				_, ok := val[j[0]]
 				if ok {
 					opts.Filter[fi] = append(opts.Filter[fi], lib.Pair{A: j[0], B: j[1]})
 				}
@@ -65,7 +65,7 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 		for _, v := range strings.Split(i[0], ",") {
 			colsAux[v] = v
 		}
-		for _, k := range colsOrdered {
+		for _, k := range fields.Ordered {
 			if _, ok := colsAux[k]; ok {
 				opts.Null = append(opts.Null, k)
 			}
@@ -79,7 +79,7 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 		for _, v := range strings.Split(i[0], ",") {
 			colsAux[v] = v
 		}
-		for _, k := range colsOrdered {
+		for _, k := range fields.Ordered {
 			if _, ok := colsAux[k]; ok {
 				opts.NotNull = append(opts.NotNull, k)
 			}
@@ -95,14 +95,14 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 		for _, v := range j {
 			colsAux[v] = v
 		}
-		for _, k := range colsOrdered {
+		for _, k := range fields.Ordered {
 			_, ok := colsAux[k]
 			if ok {
 				opts.Column = append(opts.Column, k)
 			}
 		}
 	} else {
-		opts.Column = colsOrdered
+		opts.Column = fields.Ordered
 	}
 
 	//order
@@ -112,7 +112,7 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 		j := strings.Split(i[0], ";")
 		for _, k := range j {
 			j := strings.Split(k, "|")
-			_, ok := cols[j[0]]
+			_, ok := val[j[0]]
 			if !ok {
 				continue
 			}

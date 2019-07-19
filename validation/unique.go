@@ -40,8 +40,7 @@ func Unique(
 	}
 
 	sql, args := sb.Build()
-	//log.Println(param, f)
-	//log.Println(sql, args)
+	//fmt.Println(sql, args)
 	if err := db.Db().QueryRow(sql, args...).Scan(&count); err != nil || count > 0 {
 		return false
 	}

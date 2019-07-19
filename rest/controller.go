@@ -99,7 +99,7 @@ func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 //Post exported
 func (ctrl Controller) Post(c *gin.Context, m db.Model) {
 
-	if err := c.ShouldBind(m); err != nil {
+	if err := m.Bind(c, []lib.Pair{}); err != nil {
 		/*
 		 * payload isn't correct
 		 */
@@ -108,23 +108,14 @@ func (ctrl Controller) Post(c *gin.Context, m db.Model) {
 			c.JSON(
 				http.StatusBadRequest,
 				gin.H{"message": "There are validation errors",
-					"errors": validation.GetMessages(err)},
+					"errors": validation.GetMessages(err, m)},
 			)
 		default:
 			c.JSON(
 				http.StatusBadRequest,
-				gin.H{"message": "Malformed payload"},
+				gin.H{"message": err.Error()},
 			)
 		}
-	} else if err := m.FilterInput([]lib.Pair{}); err != nil {
-		/*
-		 * payload isn't correct
-		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"message": "There are validation errors",
-				"errors": err},
-		)
 	} else if err := db.Insert(m); err != nil {
 		/*
 		 * maybe something went wrong connecting to the db
@@ -161,7 +152,7 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 			http.StatusNotFound,
 			gin.H{"message": "Not found!"},
 		)
-	} else if err := c.ShouldBind(m); err != nil {
+	} else if err := m.Bind(c, pIDs); err != nil {
 		/*
 		 * payload isn't correct
 		 */
@@ -170,7 +161,7 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 			c.JSON(
 				http.StatusBadRequest,
 				gin.H{"message": "There are validation errors",
-					"errors": validation.GetMessages(err)},
+					"errors": validation.GetMessages(err, m)},
 			)
 		default:
 			c.JSON(
@@ -178,15 +169,6 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 				gin.H{"message": err.Error()},
 			)
 		}
-	} else if err := m.FilterInput(pIDs); err != nil {
-		/*
-		 * payload isn't correct
-		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"message": "There are validation errors",
-				"errors": err},
-		)
 	} else if err := db.Update(m, pIDs); err == sql.ErrNoRows {
 		/*
 		 * this shouldn't happen as suppousedly the resource exists
