@@ -32,6 +32,12 @@ type ResultSetMeta struct {
 	Checksum string
 }
 
+//ScopedModel interface exported
+type ScopedModel interface {
+	Model
+	ScopeOk(c *gin.Context) bool
+}
+
 //Model exported
 type Model interface {
 	New() Model

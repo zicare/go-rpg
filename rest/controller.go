@@ -12,7 +12,14 @@ import (
 )
 
 //Controller exported
-type Controller struct{}
+type Controller struct {
+	err error
+}
+
+//Error exported
+func (ctrl Controller) Error() error {
+	return ctrl.err
+}
 
 //Index exported
 func (ctrl Controller) Index(c *gin.Context, m db.Model) {
@@ -91,39 +98,48 @@ func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 			http.StatusInternalServerError,
 			gin.H{"message": err.Error()},
 		)
+	} else if sm, ok := m.(db.ScopedModel); ok == true && sm.ScopeOk(c) == false {
+		/*
+		 * requested resource is scoped and it doesn't belong
+		 * maybe track unscoped requests and take action on abuse?
+		 */
+		c.JSON(
+			http.StatusNotFound,
+			gin.H{"message": "Not found!"},
+		)
 	} else {
 		c.JSON(http.StatusOK, m.Xfrm())
 	}
 }
 
 //Post exported
-func (ctrl Controller) Post(c *gin.Context, m db.Model) {
+func (ctrl *Controller) Post(c *gin.Context, m db.Model) {
 
-	if err := m.Bind(c, []lib.Pair{}); err != nil {
+	if ctrl.err = m.Bind(c, []lib.Pair{}); ctrl.err != nil {
 		/*
 		 * payload isn't correct
 		 */
-		switch err.(type) {
+		switch ctrl.err.(type) {
 		case validator.ValidationErrors:
 			c.JSON(
 				http.StatusBadRequest,
 				gin.H{"message": "There are validation errors",
-					"errors": validation.GetMessages(err, m)},
+					"errors": validation.GetMessages(ctrl.err, m)},
 			)
 		default:
 			c.JSON(
 				http.StatusBadRequest,
-				gin.H{"message": err.Error()},
+				gin.H{"message": ctrl.err.Error()},
 			)
 		}
-	} else if err := db.Insert(m); err != nil {
+	} else if ctrl.err = db.Insert(m); ctrl.err != nil {
 		/*
 		 * maybe something went wrong connecting to the db
 		 * or some constrain was not verified and violated, etc
 		 */
 		c.JSON(
 			http.StatusBadRequest,
-			gin.H{"message": err.Error()},
+			gin.H{"message": ctrl.err.Error()},
 		)
 	} else {
 		/*
@@ -136,15 +152,18 @@ func (ctrl Controller) Post(c *gin.Context, m db.Model) {
 //Put exported
 func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 
-	if pIDs, err := ParamIDs(c, m); err != nil {
+	var pIDs []lib.Pair
+	var aux = m.New()
+
+	if pIDs, ctrl.err = ParamIDs(c, m); ctrl.err != nil {
 		/*
 		 * pIDs count didn't match table's primary key count
 		 */
 		c.JSON(
 			http.StatusBadRequest,
-			gin.H{"message": err.Error()},
+			gin.H{"message": ctrl.err.Error()},
 		)
-	} else if err := db.Find(m.New(), pIDs); err != nil {
+	} else if ctrl.err = db.Find(aux, pIDs); ctrl.err != nil {
 		/*
 		 * requested resource doesn't exist
 		 */
@@ -152,24 +171,33 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 			http.StatusNotFound,
 			gin.H{"message": "Not found!"},
 		)
-	} else if err := m.Bind(c, pIDs); err != nil {
+	} else if sm, ok := aux.(db.ScopedModel); ok == true && sm.ScopeOk(c) == false {
+		/*
+		 * requested resource is scoped and it doesn't belong
+		 * maybe track unscoped requests and take action on abuse?
+		 */
+		c.JSON(
+			http.StatusNotFound,
+			gin.H{"message": "Not found!"},
+		)
+	} else if ctrl.err = m.Bind(c, pIDs); ctrl.err != nil {
 		/*
 		 * payload isn't correct
 		 */
-		switch err.(type) {
+		switch ctrl.err.(type) {
 		case validator.ValidationErrors:
 			c.JSON(
 				http.StatusBadRequest,
 				gin.H{"message": "There are validation errors",
-					"errors": validation.GetMessages(err, m)},
+					"errors": validation.GetMessages(ctrl.err, m)},
 			)
 		default:
 			c.JSON(
 				http.StatusBadRequest,
-				gin.H{"message": err.Error()},
+				gin.H{"message": ctrl.err.Error()},
 			)
 		}
-	} else if err := db.Update(m, pIDs); err == sql.ErrNoRows {
+	} else if ctrl.err = db.Update(m, pIDs); ctrl.err == sql.ErrNoRows {
 		/*
 		 * this shouldn't happen as suppousedly the resource exists
 		 * and user input curated, but you never know
@@ -180,14 +208,14 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 			http.StatusNotFound,
 			gin.H{"message": "Not found!"},
 		)
-	} else if err != nil {
+	} else if ctrl.err != nil {
 		/*
 		 * maybe something went wrong connecting to the db
 		 * or some constrain was not verified and violated, etc
 		 */
 		c.JSON(
 			http.StatusInternalServerError,
-			gin.H{"message": err.Error()},
+			gin.H{"message": ctrl.err.Error()},
 		)
 	} else {
 		/*

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/zicare/go-rpg/db"
@@ -95,8 +96,14 @@ func GetMessages(err error, m db.Model) ErrorMessages {
 		if field, ok = f[v.Field]; !ok {
 			field = v.Field
 		}
+		key := strings.Split(field, ",")
+		for _, jv := range key {
+			if jv == "omitempty" {
+				v.Value = ""
+			}
+		}
 		em = append(em, Message{
-			Key: field,
+			Key: key[0],
 			Msg: fmt.Sprintf("Value %v didn't pass %s(%s) validation", v.Value, v.Tag, v.Param)})
 	}
 
