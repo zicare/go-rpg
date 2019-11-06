@@ -18,9 +18,11 @@ var auth jwt.Payload
 //User interface exported
 type User interface {
 	db.Model
+	GetUserID() int64
+	GetParentID() *int64
 	GetEmail() string
 	GetPassword() []byte
-	GetRoleID() interface{}
+	GetRoleID() *int64
 	GetSystemAccessFrom() time.Time
 	GetSystemAccessTo() time.Time
 }
@@ -87,7 +89,7 @@ func BasicAuth(m User) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("User", m.Val())
+		c.Set("User", m)
 		c.Next()
 	}
 }
@@ -157,4 +159,10 @@ func TsAndUserID() (*time.Time, *int64) {
 	)
 
 	return &ts, &uid
+}
+
+//ParentID exported
+func ParentID() int64 {
+
+	return auth.ParentID
 }

@@ -242,6 +242,13 @@ func PID(m Model, f []string) (pID []lib.Pair) {
 	return
 }
 
+//MID exported
+func MID(k string, v int64) (mIDs []lib.Pair) {
+	mIDs = []lib.Pair{}
+	mIDs = append(mIDs, lib.Pair{A: k, B: v})
+	return
+}
+
 //TAG exported
 func TAG(m Model, tag string) (out map[string]string) {
 

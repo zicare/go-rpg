@@ -32,17 +32,23 @@ type Payload struct {
 	Audience   string `json:"aud"`
 	Subject    string `json:"sub"`
 	UserID     int64  `json:"user_id"`
+	ParentID   int64  `json:"parent_id"`
 	RoleID     int64  `json:"role_id"`
 }
 
 //Token exported
-func Token(user *int64, role *int64, duration time.Duration, secret string) (string, string) {
+func Token(user *int64, parent *int64, role *int64, duration time.Duration, secret string) (string, string) {
+
+	if parent == nil {
+		parent = user
+	}
 
 	now := time.Now()
 	j := new(Payload{
 		IssuedAt:   now.Unix(),
 		Expiration: now.Add(duration).Unix(),
 		UserID:     *user,
+		ParentID:   *parent,
 		RoleID:     *role,
 	}, secret)
 
