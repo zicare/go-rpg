@@ -161,8 +161,23 @@ func TsAndUserID() (*time.Time, *int64) {
 	return &ts, &uid
 }
 
+//UserID exported
+func UserID() int64 {
+
+	return auth.UserID
+}
+
 //ParentID exported
 func ParentID() int64 {
 
 	return auth.ParentID
+}
+
+//IsParent exported
+func IsParent() bool {
+
+	if auth.UserID > 0 {
+		return auth.ParentID == auth.UserID
+	}
+	return false
 }
