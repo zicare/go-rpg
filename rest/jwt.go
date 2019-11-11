@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/zicare/go-rpg/acl"
 	"github.com/zicare/go-rpg/config"
-	"github.com/zicare/go-rpg/jwt"
 )
 
 //JwtController exported
@@ -39,7 +38,8 @@ func (ctrl JwtController) Get(c *gin.Context) {
 		duration = u.GetSystemAccessTo().Sub(now)
 	}
 
-	id := u.GetUserID()
-	token, expiration := jwt.Token(&id, u.GetParentID(), u.GetRoleID(), duration, secret)
+	//id := u.GetUserID()
+	//token, expiration := jwt.Token(&id, u.GetParentID(), u.GetRoleID(), u.GetTPS(), duration, secret)
+	token, expiration := acl.JwtToken(u, duration, secret)
 	c.JSON(http.StatusOK, gin.H{"token": token, "expiration": expiration})
 }

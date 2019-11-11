@@ -1,4 +1,4 @@
-package jwt
+package acl
 
 import (
 	"crypto/hmac"
@@ -14,7 +14,7 @@ import (
 
 type jwt struct {
 	header     header
-	payload    Payload
+	payload    JwtPayload
 	token      string
 	expiration string
 }
@@ -24,42 +24,52 @@ type header struct {
 	Alg string `json:"alg"`
 }
 
-//Payload exported
-type Payload struct {
-	Issuer     string `json:"iss"`
-	IssuedAt   int64  `json:"iat"`
-	Expiration int64  `json:"exp"`
-	Audience   string `json:"aud"`
-	Subject    string `json:"sub"`
-	UserID     int64  `json:"user_id"`
-	ParentID   int64  `json:"parent_id"`
-	RoleID     int64  `json:"role_id"`
+//JwtPayload exported
+type JwtPayload struct {
+	Issuer     string  `json:"iss"`
+	IssuedAt   int64   `json:"iat"`
+	Expiration int64   `json:"exp"`
+	Audience   string  `json:"aud"`
+	Subject    string  `json:"sub"`
+	UserID     int64   `json:"user_id"`
+	ParentID   int64   `json:"parent_id"`
+	RoleID     int64   `json:"role_id"`
+	TPS        float32 `json:"tps"`
 }
 
-//Token exported
-func Token(user *int64, parent *int64, role *int64, duration time.Duration, secret string) (string, string) {
+//JwtToken exported
+//func Token(user *int64, parent *int64, role *int64, tps *float32, duration time.Duration, secret string) (string, string) {
+func JwtToken(u User, duration time.Duration, secret string) (string, string) {
+
+	var (
+		user   = u.GetUserID()
+		parent = u.GetParentID()
+		role   = u.GetRoleID()
+		tps    = u.GetTPS()
+	)
 
 	if parent == nil {
-		parent = user
+		parent = &user
 	}
 
 	now := time.Now()
-	j := new(Payload{
+	j := new(JwtPayload{
 		IssuedAt:   now.Unix(),
 		Expiration: now.Add(duration).Unix(),
-		UserID:     *user,
+		UserID:     user,
 		ParentID:   *parent,
 		RoleID:     *role,
+		TPS:        *tps,
 	}, secret)
 
 	return j.token, j.expiration
 
 }
 
-//Auth exported
-func Auth(token string, secret string) (Payload, error) {
+//JwtAuth exported
+func JwtAuth(token string, secret string) (JwtPayload, error) {
 
-	var payload Payload
+	var payload JwtPayload
 
 	t := strings.Split(token, ".")
 	if len(t) != 3 {
@@ -90,7 +100,7 @@ func Auth(token string, secret string) (Payload, error) {
 
 }
 
-func new(payload Payload, secret string) jwt {
+func new(payload JwtPayload, secret string) jwt {
 
 	j := jwt{}
 	j.header = header{

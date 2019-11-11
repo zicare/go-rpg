@@ -10,10 +10,8 @@ import (
 
 	"github.com/zicare/go-rpg/config"
 	"github.com/zicare/go-rpg/db"
-	"github.com/zicare/go-rpg/jwt"
+	"github.com/zicare/go-rpg/tps"
 )
-
-var auth jwt.Payload
 
 //User interface exported
 type User interface {
@@ -25,6 +23,7 @@ type User interface {
 	GetRoleID() *int64
 	GetSystemAccessFrom() time.Time
 	GetSystemAccessTo() time.Time
+	GetTPS() *float32
 }
 
 //BasicAuth executes HTTP basic authentication
@@ -101,6 +100,8 @@ func Auth(route string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
+		var auth JwtPayload
+
 		//authenticate jwt
 		secret := config.Config().GetString("hmac_key")
 
@@ -111,7 +112,7 @@ func Auth(route string) gin.HandlerFunc {
 		}
 
 		var err error
-		auth, err = jwt.Auth(token[1], secret)
+		auth, err = JwtAuth(token[1], secret)
 		if err != nil {
 			abort(c, 401, err.Error())
 			return
@@ -131,14 +132,14 @@ func Auth(route string) gin.HandlerFunc {
 			return
 		}
 
+		if tps.IsEnabled() && tps.Transaction(auth.UserID, auth.TPS) != nil {
+			abort(c, 401, "TPS limit exceeded")
+			return
+		}
+
 		c.Set("Auth", auth)
 		c.Next()
 	}
-}
-
-//Token exported
-func Token() jwt.Payload {
-	return auth
 }
 
 func abort(c *gin.Context, code int, msg string) {
@@ -150,34 +151,61 @@ func abort(c *gin.Context, code int, msg string) {
 	c.Abort()
 }
 
+//TsAndParentID exported
+func TsAndParentID(c *gin.Context) (*time.Time, *int64) {
+
+	ts := time.Now()
+	if jp, exists := c.Get("Auth"); !exists {
+		return &ts, nil
+	} else if py, ok := jp.(JwtPayload); ok {
+		return &ts, &py.ParentID
+	}
+	return &ts, nil
+}
+
 //TsAndUserID exported
-func TsAndUserID() (*time.Time, *int64) {
+func TsAndUserID(c *gin.Context) (*time.Time, *int64) {
 
-	var (
-		ts  = time.Now()
-		uid = auth.UserID
-	)
-
-	return &ts, &uid
+	ts := time.Now()
+	if jp, exists := c.Get("Auth"); !exists {
+		return &ts, nil
+	} else if py, ok := jp.(JwtPayload); ok {
+		return &ts, &py.UserID
+	}
+	return &ts, nil
 }
 
 //UserID exported
-func UserID() int64 {
+func UserID(c *gin.Context) int64 {
 
-	return auth.UserID
+	if jp, exists := c.Get("Auth"); !exists {
+		return 0
+	} else if py, ok := jp.(JwtPayload); ok {
+		return py.UserID
+	}
+	return 0
 }
 
 //ParentID exported
-func ParentID() int64 {
+func ParentID(c *gin.Context) int64 {
 
-	return auth.ParentID
+	if jp, exists := c.Get("Auth"); !exists {
+		return 0
+	} else if py, ok := jp.(JwtPayload); ok {
+		return py.ParentID
+	}
+	return 0
 }
 
 //IsParent exported
-func IsParent() bool {
+func IsParent(c *gin.Context) bool {
 
-	if auth.UserID > 0 {
-		return auth.ParentID == auth.UserID
+	if jp, exists := c.Get("Auth"); !exists {
+		return false
+	} else if py, ok := jp.(JwtPayload); !ok {
+		return false
+	} else if py.UserID > 0 {
+		return py.ParentID == py.UserID
 	}
 	return false
 }
