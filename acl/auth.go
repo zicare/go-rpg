@@ -209,3 +209,14 @@ func IsParent(c *gin.Context) bool {
 	}
 	return false
 }
+
+//Session exported
+func Session(c *gin.Context) (JwtPayload, bool) {
+
+	if jp, exists := c.Get("Auth"); !exists {
+		return JwtPayload{}, false
+	} else if session, ok := jp.(JwtPayload); ok {
+		return session, ok
+	}
+	return JwtPayload{}, false
+}

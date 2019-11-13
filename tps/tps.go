@@ -1,6 +1,7 @@
 package tps
 
 import (
+	"errors"
 	"time"
 )
 
@@ -13,11 +14,19 @@ func IsEnabled() bool {
 }
 
 //Init exported
-func Init(chcap int, mapcln time.Duration) {
-	n = chcap
-	mcl = mapcln
-	tpsmap = make(TPSmap)
-	cleanUp()
+func Init(chcap int, mapcln time.Duration) error {
+
+	if chcap < 3 {
+		return errors.New("A minimum of 3 calls/chcap required to calculate TPS")
+	} else if mapcln < 5 {
+		return errors.New("TPS data clean up cycles must be 5 seconds or longer")
+	} else {
+		n = chcap
+		mcl = mapcln
+		tpsmap = make(TPSmap)
+		cleanUp()
+		return nil
+	}
 }
 
 //TPS exported
