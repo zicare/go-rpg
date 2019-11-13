@@ -49,6 +49,9 @@ func register(v *validator.Validate) error {
 	if err := v.RegisterValidation("unique", Unique); err != nil {
 		return err
 	}
+	if err := v.RegisterValidation("count", Count); err != nil {
+		return err
+	}
 	if err := v.RegisterValidation("json", IsJSON); err != nil {
 		return err
 	}

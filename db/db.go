@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -243,10 +244,8 @@ func PID(m Model, f []string) (pID []lib.Pair) {
 }
 
 //MID exported
-func MID(k string, v int64) (mIDs []lib.Pair) {
-	mIDs = []lib.Pair{}
-	mIDs = append(mIDs, lib.Pair{A: k, B: v})
-	return
+func MID(k string, v int64) []lib.Pair {
+	return []lib.Pair{{A: k, B: strconv.FormatInt(v, 10)}}
 }
 
 //TAG exported
