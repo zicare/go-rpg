@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zicare/go-rpg/slice"
+
 	"github.com/zicare/go-rpg/config"
 	"github.com/zicare/go-rpg/db"
 	"github.com/zicare/go-rpg/lib"
@@ -45,10 +47,9 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 	opts.Filter = make(map[string][]lib.Pair)
 	for _, fi := range cf {
 		opts.Filter[fi] = []lib.Pair{}
-		i, ok := param[fi]
-		if ok {
-			j := strings.Split(i[0], ";")
-			for _, k := range j {
+		if i, ok := param[fi]; ok {
+			//j := strings.Split(i[0], ";")
+			for _, k := range i {
 				j := strings.Split(k, "|")
 				_, ok := val[j[0]]
 				if ok {
@@ -88,16 +89,14 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 
 	//column
 	opts.Column = []string{}
-	i, ok := param["cols"]
-	if ok {
+	if i, ok := param["cols"]; ok {
 		colsAux := make(map[string]string)
 		j := strings.Split(i[0], ",")
 		for _, v := range j {
 			colsAux[v] = v
 		}
 		for _, k := range fields.Ordered {
-			_, ok := colsAux[k]
-			if ok {
+			if _, ok := colsAux[k]; ok {
 				opts.Column = append(opts.Column, k)
 			}
 		}
@@ -105,18 +104,20 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 		opts.Column = fields.Ordered
 	}
 
+	//xcols
+	if i, ok := param["xcols"]; ok {
+		opts.Column = slice.Diff(opts.Column, strings.Split(i[0], ","))
+	}
+
 	//order
 	opts.Order = []string{}
-	i, ok = param["order"]
-	if ok {
+	if i, ok := param["order"]; ok {
 		j := strings.Split(i[0], ";")
 		for _, k := range j {
 			j := strings.Split(k, "|")
-			_, ok := val[j[0]]
-			if !ok {
+			if _, ok := val[j[0]]; !ok {
 				continue
-			}
-			if len(j) == 1 {
+			} else if len(j) == 1 {
 				opts.Order = append(opts.Order, j[0]+" ASC")
 			} else if strings.ToUpper(j[1]) == "ASC" || strings.ToUpper(j[1]) == "DESC" {
 				opts.Order = append(opts.Order, j[0]+" "+strings.ToUpper(j[1]))
@@ -127,8 +128,7 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 	//offset and limit
 	opts.Offset = 0
 	opts.Limit, _ = strconv.Atoi(config.Config().GetString("param.icpp"))
-	i, ok = param["limit"]
-	if ok {
+	if i, ok := param["limit"]; ok {
 		j := strings.Split(i[0], ",")
 		switch len(j) {
 		case 1:

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -264,4 +265,19 @@ func TAG(m Model, tag string) (out map[string]string) {
 		}
 	}
 	return
+}
+
+//NullString exported
+//This sql.NullString wrapper is a workaround to the
+//json: cannot unmarshal string into Go value of type sql.NullString error
+//when unmarshalling null values from postgres
+type NullString struct {
+	sql.NullString
+}
+
+//UnmarshalJSON exported
+func (s *NullString) UnmarshalJSON(data []byte) error {
+	s.String = strings.Trim(string(data), `"`)
+	s.Valid = true
+	return nil
 }

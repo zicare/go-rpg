@@ -1,0 +1,2 @@
+1. Validate that id param matches the model type.
+For example in GET /users/ejdkfje the id=ejdkfje is not an int64. The framework should return bad request.
