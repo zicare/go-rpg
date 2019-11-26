@@ -49,6 +49,37 @@ type Model interface {
 	Xfrm() Model
 	Bind(*gin.Context, []lib.Pair) error
 	Validation(*validator.Validate, *validator.StructLevel)
+	Delete(*gin.Context, []lib.Pair) error
+}
+
+//NotFoundError exported
+type NotFoundError struct {
+	MSG string
+}
+
+//Error exported
+func (e *NotFoundError) Error() string {
+	return e.MSG
+}
+
+//NotAllowedError exported
+type NotAllowedError struct {
+	MSG string
+}
+
+//Error exported
+func (e *NotAllowedError) Error() string {
+	return e.MSG
+}
+
+//ParamError exported
+type ParamError struct {
+	MSG string
+}
+
+//Error exported
+func (e *ParamError) Error() string {
+	return e.MSG
 }
 
 /*

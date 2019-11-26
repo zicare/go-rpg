@@ -224,3 +224,42 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 		c.JSON(http.StatusCreated, m.Xfrm())
 	}
 }
+
+//Delete exported
+func (ctrl Controller) Delete(c *gin.Context, m db.Model) {
+
+	var pIDs []lib.Pair
+
+	if pIDs, ctrl.err = ParamIDs(c, m); ctrl.err != nil {
+		/*
+		 * composite key missuse
+		 */
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{"message": ctrl.err.Error()},
+		)
+	} else if ctrl.err = m.Delete(c, pIDs); ctrl.err != nil {
+		switch e := ctrl.err.(type) {
+		case *db.NotAllowedError:
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": e.Error()},
+			)
+		case *db.NotFoundError:
+			c.JSON(
+				http.StatusNotFound,
+				gin.H{"message": e.Error()},
+			)
+		default:
+			c.JSON(
+				http.StatusInternalServerError,
+				gin.H{"message": ctrl.err.Error()},
+			)
+		}
+	} else {
+		c.JSON(
+			http.StatusOK,
+			gin.H{"message": "Deleted"},
+		)
+	}
+}
