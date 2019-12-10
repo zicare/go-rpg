@@ -96,6 +96,7 @@ func BasicAuth(m User) gin.HandlerFunc {
 //Auth exported
 //Jwt must be correct and not expired
 //Also, authorization towards the ACL must be passed
+//Also, can't be found in acl.DeleteUsers registry
 func Auth(route string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -134,6 +135,11 @@ func Auth(route string) gin.HandlerFunc {
 
 		if tps.IsEnabled() && tps.Transaction(auth.UserID, auth.TPS) != nil {
 			abort(c, 401, "TPS limit exceeded")
+			return
+		}
+
+		if _, ok := DeletedUsersMap[auth.UserID]; ok {
+			abort(c, 401, "Unauthorized")
 			return
 		}
 

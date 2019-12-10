@@ -12,6 +12,16 @@ import (
 
 var acl map[Grant]lib.TimeRange
 
+//DeletedUsersMap exported
+//Keeps a registry with users deleted recently
+//Entries are removed by a go-routine after a
+//period of time equal to a jwt lifespan is reached
+//It is the responsability of the client app to add
+//the entries
+//Even if a jwt token is valid, acl.Auth method won't succeed
+//if an entry for the user_id is found in this registry
+var DeletedUsersMap map[int64]time.Time
+
 //Grant exported
 type Grant struct {
 	RoleID int64
@@ -90,6 +100,10 @@ func Init(m db.Model) (err error) {
 		return err
 	}
 
+	//Initialize DeleteUsersMap
+	DeletedUsersMap = make(map[int64]time.Time)
+	cleanUpDeletedUsersMap()
+
 	//log.Println(acl)
 	return nil
 }
@@ -98,4 +112,18 @@ func Init(m db.Model) (err error) {
 func ACL() map[Grant]lib.TimeRange {
 
 	return acl
+}
+
+func cleanUpDeletedUsersMap() {
+	go func() {
+		mcl := time.Duration(60) * time.Second
+		for {
+			for k, v := range DeletedUsersMap {
+				if v.Before(time.Now()) {
+					delete(DeletedUsersMap, k)
+				}
+			}
+			time.Sleep(mcl)
+		}
+	}()
 }

@@ -250,6 +250,11 @@ func (ctrl Controller) Delete(c *gin.Context, m db.Model) {
 				http.StatusNotFound,
 				gin.H{"message": e.Error()},
 			)
+		case *db.ConflictError:
+			c.JSON(
+				http.StatusConflict,
+				gin.H{"message": e.Error()},
+			)
 		default:
 			c.JSON(
 				http.StatusInternalServerError,

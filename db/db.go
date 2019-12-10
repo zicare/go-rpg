@@ -72,6 +72,16 @@ func (e *NotAllowedError) Error() string {
 	return e.MSG
 }
 
+//ConflictError exported
+type ConflictError struct {
+	MSG string
+}
+
+//Error exported
+func (e *ConflictError) Error() string {
+	return e.MSG
+}
+
 //ParamError exported
 type ParamError struct {
 	MSG string
