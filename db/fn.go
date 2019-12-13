@@ -1,45 +1,44 @@
-package rest
+package db
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/zicare/go-rpg/slice"
 
 	"github.com/zicare/go-rpg/config"
-	"github.com/zicare/go-rpg/db"
 	"github.com/zicare/go-rpg/lib"
 
 	"github.com/gin-gonic/gin"
 )
 
 //ParamIDs exported
-func ParamIDs(c *gin.Context, m db.Model) (mIDs []lib.Pair, err error) {
+func ParamIDs(c *gin.Context, m Model) ([]lib.Pair, error) {
 
 	var (
+		mIDs      = []lib.Pair{}
 		pkParam   = strings.Split(c.Param("id"), ",")
-		fields, _ = db.Fields(m)
+		fields, _ = Fields(m)
 	)
 
 	if len(pkParam) != len(fields.Primary) {
-		err = errors.New("Composite key missuse")
-		return
+		e := new(ParamError)
+		e.MSG = "Composite key missuse"
+		return mIDs, e
 	}
 
 	//mIDs
-	mIDs = []lib.Pair{}
 	for i, k := range fields.Primary {
 		mIDs = append(mIDs, lib.Pair{A: k, B: pkParam[i]})
 	}
-	return
+	return mIDs, nil
 }
 
-func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
+func params(c *gin.Context, m Model) (opts SelectOpt) {
 
 	var (
 		cf          = [5]string{"eq", "gt", "st", "gteq", "steq"}
-		fields, val = db.Fields(m)
+		fields, val = Fields(m)
 		param       = c.Request.URL.Query()
 	)
 
@@ -58,6 +57,15 @@ func params(c *gin.Context, m db.Model) (opts db.SelectOpt) {
 			}
 		}
 	}
+
+	/*
+		//scope filter
+		if sm, ok := m.(ScopedModel); ok == true {
+			for _, sf := range sm.GetScope(c) {
+				opts.Filter["eq"] = append(opts.Filter["eq"], sf)
+			}
+		}
+	*/
 
 	//null
 	opts.Null = []string{}

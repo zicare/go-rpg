@@ -33,6 +33,9 @@ func Init() error {
 		if err := register(bindingValidator); err != nil {
 			return err
 		}
+		//Registers an alias
+		//nickname is the alias for hostname,max=128
+		//bindingValidator.RegisterAliasValidation("nickname", "hostname,min=5,max=128")
 	} else {
 		return errors.New("Couldn't retrieve Gin's default validator engine")
 	}

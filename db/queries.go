@@ -8,21 +8,26 @@ import (
 	"strconv"
 	"strings"
 
+	"database/sql"
+
+	"github.com/gin-gonic/gin"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/zicare/go-rpg/lib"
 	"github.com/zicare/go-rpg/slice"
 )
 
 //FetchAll exported
-func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
+func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 
 	var (
-		meta        = ResultSetMeta{Range: "*/*", Checksum: "*"}
-		total       string
-		results     []interface{}
-		table       = m.View()
-		modelStruct = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
-		sb          = modelStruct.SelectFrom(table)
+		opt     = params(c, m)
+		meta    = ResultSetMeta{Range: "*/*", Checksum: "*"}
+		total   string
+		results []interface{}
+		table   = m.View()
+		ms      = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
+		sb      = ms.SelectFrom(table)
 
 		//where
 		fnFst = func(v string) string { p := strings.Split(v, ","); return p[0] }
@@ -40,6 +45,9 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 			"steq": func(k string, v string) string { return sb.LessEqualThan(k, fnFst(v)) },
 		}
 	)
+
+	//set where scope
+	m.Scope(sb, c)
 
 	//set where
 	for i, j := range cond {
@@ -89,7 +97,7 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 
 	//scan rows
 	for rows.Next() {
-		err := rows.Scan(modelStruct.AddrWithCols(opt.Column, &m)...)
+		err := rows.Scan(ms.AddrWithCols(opt.Column, &m)...)
 		if err != nil {
 			return meta, results, err
 		}
@@ -114,28 +122,28 @@ func FetchAll(m Model, opt SelectOpt) (ResultSetMeta, []interface{}, error) {
 }
 
 //Find exported
-func Find(m Model, id []lib.Pair) error {
+func Find(c *gin.Context, m Model) error {
 
 	var (
-		table       = m.View()
-		modelStruct = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
-		sb          = modelStruct.SelectFrom(table)
+		err error
+		id  []lib.Pair
 	)
 
-	for _, p := range id {
-		sb.Where(sb.Equal(p.A.(string), p.B.(string)))
+	if id, err = ParamIDs(c, m); err != nil {
+		return err
 	}
 
-	sql, args := sb.Build()
-	//log.Println(sql, args)
-	return db.QueryRow(sql, args...).Scan(modelStruct.Addr(&m)...)
+	return find(c, m, id, true)
 }
 
 //Insert exported
-func Insert(m Model) error {
+func Insert(c *gin.Context, m Model) error {
+
+	if err := m.Bind(c, []lib.Pair{}); err != nil {
+		return err
+	}
 
 	var (
-		err         error
 		table       = m.Table()
 		fields, val = Fields(m)
 		ms          = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
@@ -143,36 +151,51 @@ func Insert(m Model) error {
 	)
 
 	var v []interface{}
-	for _, c := range fields.Ordered {
-		if slice.Contains(fields.Primary, c) && slice.Contains(fields.Serial, c) {
+	for _, w := range fields.Ordered {
+		if slice.Contains(fields.Primary, w) && slice.Contains(fields.Serial, w) {
 			v = append(v, sqlbuilder.Raw("DEFAULT"))
-		} else if !slice.Contains(fields.View, c) {
-			v = append(v, val[c])
+		} else if !slice.Contains(fields.View, w) {
+			v = append(v, val[w])
 		}
 	}
 
 	ib.InsertInto(table)
 	ib.Values(v...)
+
 	sql, args := ib.Build()
 	//fmt.Println(sql, args)
-	if err = db.QueryRow(sql+" RETURNING *", args...).
-		Scan(ms.AddrWithCols(fields.Writable, &m)...); err == nil {
-		return Find(m, PID(m, fields.Primary))
+	if err := db.QueryRow(sql+" RETURNING *", args...).
+		Scan(ms.AddrWithCols(fields.Writable, &m)...); err != nil {
+		return err
 	}
-	return err
+
+	return find(c, m, PID(m, fields.Primary), false)
 }
 
 //Update exported
-func Update(m Model, id []lib.Pair) error {
+func Update(c *gin.Context, m Model) error {
 
 	var (
-		table       = m.Table()
-		fields, val = Fields(m)
-		ms          = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
-		ub          = sqlbuilder.PostgreSQL.NewUpdateBuilder()
+		err   error
+		id    []lib.Pair
+		table = m.Table()
+		meta  Meta
+		val   map[string]interface{}
+		ub    = sqlbuilder.PostgreSQL.NewUpdateBuilder()
 	)
 
+	if id, err = ParamIDs(c, m); err != nil {
+		//composite key misuse
+		return err
+	} else if err = m.Bind(c, id); err != nil {
+		//payload problem
+		return err
+	}
+
+	meta, val = Fields(m)
 	ub.Update(table)
+
+	m.Scope(ub, c)
 
 	for _, p := range id {
 		ub.Where(ub.Equal(p.A.(string), p.B.(string)))
@@ -184,13 +207,54 @@ func Update(m Model, id []lib.Pair) error {
 
 	var asg []string
 	for k, v := range val {
-		if !reflect.ValueOf(v).IsNil() && slice.Contains(fields.Writable, k) {
+		if !reflect.ValueOf(v).IsNil() && slice.Contains(meta.Writable, k) {
 			asg = append(asg, ub.Assign(k, v))
 		}
 	}
 	ub.Set(asg...)
 
-	sql, args := ub.Build() //;log.Println(sql, args)
-	db.QueryRow(sql+" RETURNING *", args...).Scan(ms.AddrWithCols(fields.Writable, &m)...)
-	return Find(m, PID(m, fields.Primary))
+	sql, args := ub.Build()
+	//fmt.Println(sql, args)
+	if res, err := db.Exec(sql, args...); err != nil {
+		return err
+	} else if rows, _ := res.RowsAffected(); rows == 0 {
+		e := new(NotFoundError)
+		e.MSG = "Not found"
+		return e
+	}
+
+	return find(c, m, id, false)
+}
+
+//ByID exported
+func ByID(c *gin.Context, m Model, id []lib.Pair) error {
+	return find(c, m, id, true)
+}
+
+func find(c *gin.Context, m Model, id []lib.Pair, scope bool) error {
+
+	var (
+		table = m.View()
+		ms    = sqlbuilder.NewStruct(m).For(sqlbuilder.PostgreSQL)
+		sb    = ms.SelectFrom(table)
+	)
+
+	if scope {
+		m.Scope(sb, c)
+	}
+
+	for _, p := range id {
+		sb.Where(sb.Equal(p.A.(string), p.B.(string)))
+	}
+
+	q, args := sb.Build()
+	//log.Println(q, args)
+	if err := db.QueryRow(q, args...).Scan(ms.Addr(&m)...); err == sql.ErrNoRows {
+		e := new(NotFoundError)
+		e.MSG = "Not found"
+		return e
+	} else if err != nil {
+		return err
+	}
+	return nil
 }

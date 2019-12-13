@@ -4,6 +4,8 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
+	"github.com/huandu/go-sqlbuilder"
+
 	"github.com/zicare/go-rpg/lib"
 	"gopkg.in/go-playground/validator.v8"
 )
@@ -17,7 +19,7 @@ func (ReadOnlyModel) Table() string {
 }
 
 //Bind exported
-func (branch ReadOnlyModel) Bind(c *gin.Context, pIDs []lib.Pair) error {
+func (ReadOnlyModel) Bind(c *gin.Context, pIDs []lib.Pair) error {
 	return errors.New("Read only model")
 }
 
@@ -25,6 +27,11 @@ func (branch ReadOnlyModel) Bind(c *gin.Context, pIDs []lib.Pair) error {
 func (ReadOnlyModel) Validation(v *validator.Validate, sl *validator.StructLevel) {}
 
 //Delete exported
-func (branch ReadOnlyModel) Delete(c *gin.Context, pIDs []lib.Pair) error {
+func (ReadOnlyModel) Delete(c *gin.Context, pIDs []lib.Pair) error {
 	return errors.New("Read only model")
+}
+
+//Scope exported
+func (ReadOnlyModel) Scope(b sqlbuilder.Builder, c *gin.Context) {
+	return
 }

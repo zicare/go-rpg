@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/huandu/go-sqlbuilder"
 
 	//required
 	_ "github.com/lib/pq"
@@ -34,12 +35,6 @@ type ResultSetMeta struct {
 	Checksum string
 }
 
-//ScopedModel interface exported
-type ScopedModel interface {
-	Model
-	ScopeOk(c *gin.Context) bool
-}
-
 //Model exported
 type Model interface {
 	New() Model
@@ -50,6 +45,7 @@ type Model interface {
 	Bind(*gin.Context, []lib.Pair) error
 	Validation(*validator.Validate, *validator.StructLevel)
 	Delete(*gin.Context, []lib.Pair) error
+	Scope(sqlbuilder.Builder, *gin.Context)
 }
 
 //NotFoundError exported

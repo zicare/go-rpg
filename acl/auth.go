@@ -203,6 +203,17 @@ func ParentID(c *gin.Context) int64 {
 	return 0
 }
 
+//RoleID exported
+func RoleID(c *gin.Context) int64 {
+
+	if jp, exists := c.Get("Auth"); !exists {
+		return 0
+	} else if py, ok := jp.(JwtPayload); ok {
+		return py.RoleID
+	}
+	return 0
+}
+
 //IsParent exported
 func IsParent(c *gin.Context) bool {
 

@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -24,12 +23,7 @@ func (ctrl Controller) Error() error {
 //Index exported
 func (ctrl Controller) Index(c *gin.Context, m db.Model) {
 
-	var (
-		opt             = params(c, m)
-		meta, data, err = db.FetchAll(m, opt)
-	)
-
-	if err != nil {
+	if meta, data, err := db.FetchAll(c, m); err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
 			gin.H{"message": err.Error()},
@@ -54,12 +48,7 @@ func (ctrl Controller) Index(c *gin.Context, m db.Model) {
 //IndexHead exported
 func (ctrl Controller) IndexHead(c *gin.Context, m db.Model) {
 
-	var (
-		opt             = params(c, m)
-		meta, data, err = db.FetchAll(m, opt)
-	)
-
-	if err != nil {
+	if meta, data, err := db.FetchAll(c, m); err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
 			gin.H{"message": err.Error()},
@@ -80,33 +69,24 @@ func (ctrl Controller) IndexHead(c *gin.Context, m db.Model) {
 //Get exported
 func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 
-	if pIDs, err := ParamIDs(c, m); err != nil {
-		/*
-		 * composite key missuse
-		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"message": err.Error()},
-		)
-	} else if err = db.Find(m, pIDs); err == sql.ErrNoRows {
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{"message": "Not found!"},
-		)
-	} else if err != nil {
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{"message": err.Error()},
-		)
-	} else if sm, ok := m.(db.ScopedModel); ok == true && sm.ScopeOk(c) == false {
-		/*
-		 * requested resource is scoped and it doesn't belong
-		 * maybe track unscoped requests and take action on abuse?
-		 */
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{"message": "Not found!"},
-		)
+	if err := db.Find(c, m); err != nil {
+		switch e := err.(type) {
+		case *db.NotFoundError:
+			c.JSON(
+				http.StatusNotFound,
+				gin.H{"message": "Not found!"},
+			)
+		case *db.ParamError:
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": e.Error()},
+			)
+		default:
+			c.JSON(
+				http.StatusInternalServerError,
+				gin.H{"message": err.Error()},
+			)
+		}
 	} else {
 		c.JSON(http.StatusOK, m.Xfrm())
 	}
@@ -115,36 +95,29 @@ func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 //Post exported
 func (ctrl *Controller) Post(c *gin.Context, m db.Model) {
 
-	if ctrl.err = m.Bind(c, []lib.Pair{}); ctrl.err != nil {
-		/*
-		 * payload isn't correct
-		 */
+	if ctrl.err = db.Insert(c, m); ctrl.err != nil {
 		switch ctrl.err.(type) {
+		case *db.NotFoundError:
+			//Resource created but out of the read scope
+			//so response is 204
+			c.AbortWithStatus(http.StatusNoContent)
 		case validator.ValidationErrors:
+			//Resource not created
+			//payload isn't correct
 			c.JSON(
 				http.StatusBadRequest,
 				gin.H{"message": "There are validation errors",
 					"errors": validation.GetMessages(ctrl.err, m)},
 			)
 		default:
+			//Resource not created
+			//something went wrong but we don't know what
 			c.JSON(
-				http.StatusBadRequest,
+				http.StatusInternalServerError,
 				gin.H{"message": ctrl.err.Error()},
 			)
 		}
-	} else if ctrl.err = db.Insert(m); ctrl.err != nil {
-		/*
-		 * maybe something went wrong connecting to the db
-		 * or some constrain was not verified and violated, etc
-		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"message": ctrl.err.Error()},
-		)
 	} else {
-		/*
-		 * everything went okay
-		 */
 		c.JSON(http.StatusCreated, m.Xfrm())
 	}
 }
@@ -152,40 +125,22 @@ func (ctrl *Controller) Post(c *gin.Context, m db.Model) {
 //Put exported
 func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 
-	var pIDs []lib.Pair
-	var aux = m.New()
-
-	if pIDs, ctrl.err = ParamIDs(c, m); ctrl.err != nil {
-		/*
-		 * pIDs count didn't match table's primary key count
-		 */
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"message": ctrl.err.Error()},
-		)
-	} else if ctrl.err = db.Find(aux, pIDs); ctrl.err != nil {
-		/*
-		 * requested resource doesn't exist
-		 */
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{"message": "Not found!"},
-		)
-	} else if sm, ok := aux.(db.ScopedModel); ok == true && sm.ScopeOk(c) == false {
-		/*
-		 * requested resource is scoped and it doesn't belong
-		 * maybe track unscoped requests and take action on abuse?
-		 */
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{"message": "Not found!"},
-		)
-	} else if ctrl.err = m.Bind(c, pIDs); ctrl.err != nil {
-		/*
-		 * payload isn't correct
-		 */
-		switch ctrl.err.(type) {
+	if ctrl.err = db.Update(c, m); ctrl.err != nil {
+		switch e := ctrl.err.(type) {
+		case *db.ParamError:
+			//composite key missuse
+			c.JSON(
+				http.StatusBadRequest,
+				gin.H{"message": e.Error()},
+			)
+		case *db.NotFoundError:
+			//not found or out of scope
+			c.JSON(
+				http.StatusNotFound,
+				gin.H{"message": e.Error()},
+			)
 		case validator.ValidationErrors:
+			//payload issues
 			c.JSON(
 				http.StatusBadRequest,
 				gin.H{"message": "There are validation errors",
@@ -193,35 +148,12 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 			)
 		default:
 			c.JSON(
-				http.StatusBadRequest,
+				http.StatusInternalServerError,
 				gin.H{"message": ctrl.err.Error()},
 			)
 		}
-	} else if ctrl.err = db.Update(m, pIDs); ctrl.err == sql.ErrNoRows {
-		/*
-		 * this shouldn't happen as suppousedly the resource exists
-		 * and user input curated, but you never know
-		 * maybe someone else deleted the resource
-		 * since it was previously inspected
-		 */
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{"message": "Not found!"},
-		)
-	} else if ctrl.err != nil {
-		/*
-		 * maybe something went wrong connecting to the db
-		 * or some constrain was not verified and violated, etc
-		 */
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{"message": ctrl.err.Error()},
-		)
 	} else {
-		/*
-		 * everything went okay
-		 */
-		c.JSON(http.StatusCreated, m.Xfrm())
+		c.JSON(http.StatusOK, m.Xfrm())
 	}
 }
 
@@ -230,10 +162,8 @@ func (ctrl Controller) Delete(c *gin.Context, m db.Model) {
 
 	var pIDs []lib.Pair
 
-	if pIDs, ctrl.err = ParamIDs(c, m); ctrl.err != nil {
-		/*
-		 * composite key missuse
-		 */
+	if pIDs, ctrl.err = db.ParamIDs(c, m); ctrl.err != nil {
+		//composite key missuse
 		c.JSON(
 			http.StatusBadRequest,
 			gin.H{"message": ctrl.err.Error()},
@@ -262,9 +192,7 @@ func (ctrl Controller) Delete(c *gin.Context, m db.Model) {
 			)
 		}
 	} else {
-		c.JSON(
-			http.StatusOK,
-			gin.H{"message": "Deleted"},
-		)
+		//deleted
+		c.AbortWithStatus(http.StatusNoContent)
 	}
 }
