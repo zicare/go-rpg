@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/zicare/go-rpg/db"
+	"github.com/zicare/go-rpg/lib"
 
 	validator "gopkg.in/go-playground/validator.v8"
 )
@@ -98,19 +100,33 @@ func GetMessages(err error, m db.Model) ErrorMessages {
 		ok    bool
 	)
 
-	for _, v := range err.(validator.ValidationErrors) {
-		if field, ok = f[v.Field]; !ok {
-			field = v.Field
-		}
-		key := strings.Split(field, ",")
-		for _, jv := range key {
-			if jv == "omitempty" {
-				v.Value = ""
-			}
-		}
+	switch err.(type) {
+	case *time.ParseError:
+		e := err.(*time.ParseError)
 		em = append(em, Message{
-			Key: key[0],
-			Msg: fmt.Sprintf("Value %v didn't pass %s(%s) validation", v.Value, v.Tag, v.Param)})
+			Key: "-",
+			Msg: fmt.Sprintf("Time %s has a wrong format, required format is %s",
+				lib.TrimQuotes(e.Value), "2006-01-02T15:04:05-07:00")})
+	case *json.UnmarshalTypeError:
+		e := err.(*json.UnmarshalTypeError)
+		em = append(em, Message{
+			Key: e.Field,
+			Msg: fmt.Sprintf("Value is a %s, required type is %s.", e.Value, e.Type)})
+	case validator.ValidationErrors:
+		for _, v := range err.(validator.ValidationErrors) {
+			if field, ok = f[v.Field]; !ok {
+				field = v.Field
+			}
+			key := strings.Split(field, ",")
+			for _, jv := range key {
+				if jv == "omitempty" {
+					v.Value = ""
+				}
+			}
+			em = append(em, Message{
+				Key: key[0],
+				Msg: fmt.Sprintf("Value %v didn't pass %s(%s) validation", v.Value, v.Tag, v.Param)})
+		}
 	}
 
 	return em

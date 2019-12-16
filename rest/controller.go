@@ -1,7 +1,9 @@
 package rest
 
 import (
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zicare/go-rpg/db"
@@ -101,7 +103,7 @@ func (ctrl *Controller) Post(c *gin.Context, m db.Model) {
 			//Resource created but out of the read scope
 			//so response is 204
 			c.AbortWithStatus(http.StatusNoContent)
-		case validator.ValidationErrors:
+		case validator.ValidationErrors, *time.ParseError, *json.UnmarshalTypeError:
 			//Resource not created
 			//payload isn't correct
 			c.JSON(
@@ -139,7 +141,7 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 				http.StatusNotFound,
 				gin.H{"message": e.Error()},
 			)
-		case validator.ValidationErrors:
+		case validator.ValidationErrors, *time.ParseError, *json.UnmarshalTypeError:
 			//payload issues
 			c.JSON(
 				http.StatusBadRequest,
