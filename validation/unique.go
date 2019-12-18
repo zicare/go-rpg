@@ -16,6 +16,8 @@ func Unique(
 	field reflect.Value, fieldType reflect.Type, fieldKind reflect.Kind, param string,
 ) bool {
 
+	//fmt.Println(currentStructOrField)
+
 	var (
 		f     = strings.Split(param, " ")
 		m     = currentStructOrField.Interface().(db.Model)

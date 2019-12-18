@@ -139,7 +139,9 @@ func Find(c *gin.Context, m Model) error {
 //Insert exported
 func Insert(c *gin.Context, m Model) error {
 
-	if err := m.Bind(c, []lib.Pair{}); err != nil {
+	if err := c.ShouldBind(m); err != nil {
+		return err
+	} else if err := m.Bind(c, []lib.Pair{}); err != nil {
 		return err
 	}
 
@@ -186,6 +188,8 @@ func Update(c *gin.Context, m Model) error {
 
 	if id, err = ParamIDs(c, m); err != nil {
 		//composite key misuse
+		return err
+	} else if err := c.ShouldBind(m); err != nil {
 		return err
 	} else if err = m.Bind(c, id); err != nil {
 		//payload problem
