@@ -17,10 +17,19 @@ import (
 	"github.com/zicare/go-rpg/slice"
 )
 
+func prefix(s []string, p string) []string {
+	var ps []string
+	for _, v := range s {
+		ps = append(ps, fmt.Sprintf("%s.%s", p, v))
+	}
+	return ps
+}
+
 //FetchAll exported
 func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 
 	var (
+		pxc     []string
 		opt     = params(c, m)
 		meta    = ResultSetMeta{Range: "*/*", Checksum: "*"}
 		total   string
@@ -54,18 +63,18 @@ func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 		op, ok := opt.Filter[i]
 		if ok {
 			for _, v := range op {
-				sb.Where(j(v.A.(string), v.B.(string)))
+				sb.Where(j(fmt.Sprintf("%s.%s", table, v.A.(string)), v.B.(string)))
 			}
 		}
 	}
 
 	//set where null
-	for _, j := range opt.Null {
+	for _, j := range prefix(opt.Null, table) {
 		sb.Where(sb.IsNull(j))
 	}
 
 	//set where not null
-	for _, j := range opt.NotNull {
+	for _, j := range prefix(opt.NotNull, table) {
 		sb.Where(sb.IsNotNull(j))
 	}
 
@@ -84,14 +93,16 @@ func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 	}
 
 	//set columns, order by, limit and offset
-	sb.Select(opt.Column...)
-	sb.OrderBy(opt.Order...)
+	pxc = prefix(opt.Column, table)
+	sb.Select(pxc...)
+	pxc = prefix(opt.Order, table)
+	sb.OrderBy(pxc...)
 	sb.Limit(opt.Limit)
 	sb.Offset(opt.Offset)
 
 	//buils sql and execute it
 	sql, args = sb.Build()
-	//fmt.Println(sql, args)
+	//fmt.Println(sql, args) /////////////////////////////////////////////////////////////////////////////
 	rows, err := db.Query(sql, args...)
 	defer rows.Close()
 
