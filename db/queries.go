@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zicare/go-rpg/msg"
+
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
@@ -84,7 +86,8 @@ func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 	//fmt.Println(sql, args)
 	err := db.QueryRow(sql, args...).Scan(&total)
 	if err != nil {
-		return meta, results, err
+		//Server error: %s
+		return meta, results, msg.Get("25").SetArgs(err.Error()).M2E()
 	}
 
 	//total = 0 ? no need to continue
@@ -110,13 +113,15 @@ func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 	for rows.Next() {
 		err := rows.Scan(ms.AddrWithCols(opt.Column, &m)...)
 		if err != nil {
-			return meta, results, err
+			//Server error: %s
+			return meta, results, msg.Get("25").SetArgs(err.Error()).M2E()
 		}
 		results = append(results, m.Xfrm().Val())
 	}
 	err = rows.Err()
 	if err != nil {
-		return meta, results, err
+		//Server error: %s
+		return meta, results, msg.Get("25").SetArgs(err.Error()).M2E()
 	}
 
 	//meta
@@ -135,16 +140,12 @@ func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 //Find exported
 func Find(c *gin.Context, m Model) error {
 
-	var (
-		err error
-		id  []lib.Pair
-	)
-
-	if id, err = ParamIDs(c, m); err != nil {
+	if id, err := ParamIDs(c, m); err != nil {
+		return err //*ParamError
+	} else if err := find(c, m, id, true); err != nil {
 		return err
 	}
-
-	return find(c, m, id, true)
+	return nil
 }
 
 //Insert exported
@@ -179,7 +180,8 @@ func Insert(c *gin.Context, m Model) error {
 	//fmt.Println(sql, args)
 	if err := db.QueryRow(sql+" RETURNING *", args...).
 		Scan(ms.AddrWithCols(fields.Writable, &m)...); err != nil {
-		return err
+		//Server error: %s
+		return msg.Get("25").SetArgs(err.Error()).M2E()
 	}
 
 	return find(c, m, PID(m, fields.Primary), false)
@@ -231,10 +233,11 @@ func Update(c *gin.Context, m Model) error {
 	sql, args := ub.Build()
 	//fmt.Println(sql, args)
 	if res, err := db.Exec(sql, args...); err != nil {
-		return err
+		//Server error: %s
+		return msg.Get("25").SetArgs(err.Error()).M2E()
 	} else if rows, _ := res.RowsAffected(); rows == 0 {
 		e := new(NotFoundError)
-		e.MSG = "Not found"
+		e.Copy(msg.Get("18")) //Not found!
 		return e
 	}
 
@@ -266,10 +269,11 @@ func find(c *gin.Context, m Model, id []lib.Pair, scope bool) error {
 	//log.Println(q, args)
 	if err := db.QueryRow(q, args...).Scan(ms.Addr(&m)...); err == sql.ErrNoRows {
 		e := new(NotFoundError)
-		e.MSG = "Not found"
+		e.Copy(msg.Get("18")) //Not found!
 		return e
 	} else if err != nil {
-		return err
+		//Server error: %s
+		return msg.Get("25").SetArgs(err.Error()).M2E()
 	}
 	return nil
 }

@@ -4,14 +4,13 @@ package validation
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/zicare/go-rpg/db"
 	"github.com/zicare/go-rpg/lib"
+	"github.com/zicare/go-rpg/msg"
 
 	validator "gopkg.in/go-playground/validator.v8"
 )
@@ -39,7 +38,8 @@ func Init() error {
 		//nickname is the alias for hostname,max=128
 		//bindingValidator.RegisterAliasValidation("nickname", "hostname,min=5,max=128")
 	} else {
-		return errors.New("Couldn't retrieve Gin's default validator engine")
+		//Couldn't retrieve Gin's default validator engine
+		return msg.Get("27").M2E()
 	}
 
 	return nil
@@ -63,12 +63,6 @@ func register(v *validator.Validate) error {
 	return nil
 }
 
-//Message exported
-type Message struct {
-	Key string
-	Msg string
-}
-
 //Struct exported
 func Struct(m db.Model) error {
 
@@ -80,38 +74,26 @@ func Struct(m db.Model) error {
 	return nil
 }
 
-//ErrorMessages exported
-type ErrorMessages []Message
-
-//Error exported
-func (em ErrorMessages) Error() string {
-
-	jem, _ := json.Marshal(em)
-	return string(jem)
-}
-
 //GetMessages exported
-func GetMessages(err error, m db.Model) ErrorMessages {
+func GetMessages(err error, m db.Model) (eml msg.MessageList) {
 
 	var (
 		f     = db.TAG(m, "json")
-		em    ErrorMessages
 		field string
 		ok    bool
 	)
 
 	switch err.(type) {
 	case *time.ParseError:
+		//Time %s has a wrong format, required format is %s
 		e := err.(*time.ParseError)
-		em = append(em, Message{
-			Key: "-",
-			Msg: fmt.Sprintf("Time %s has a wrong format, required format is %s",
-				lib.TrimQuotes(e.Value), "2006-01-02T15:04:05-07:00")})
+		m := msg.Get("22").SetArgs(lib.TrimQuotes(e.Value), "2006-01-02T15:04:05-07:00")
+		eml = append(eml, m)
 	case *json.UnmarshalTypeError:
+		//Value is a %s, required type is %s
 		e := err.(*json.UnmarshalTypeError)
-		em = append(em, Message{
-			Key: e.Field,
-			Msg: fmt.Sprintf("Value is a %s, required type is %s.", e.Value, e.Type)})
+		m := msg.Get("23").SetArgs(e.Value, e.Type.String()).SetField(e.Field)
+		eml = append(eml, m)
 	case validator.ValidationErrors:
 		for _, v := range err.(validator.ValidationErrors) {
 			if field, ok = f[v.Field]; !ok {
@@ -123,13 +105,13 @@ func GetMessages(err error, m db.Model) ErrorMessages {
 					v.Value = ""
 				}
 			}
-			em = append(em, Message{
-				Key: key[0],
-				Msg: fmt.Sprintf("Value %v didn't pass %s(%s) validation", v.Value, v.Tag, v.Param)})
+			//Value %s didn't pass %s(%s) validation
+			m := msg.Get("24").SetArgs(v.Value, v.Tag, v.Param).SetField(key[0])
+			eml = append(eml, m)
 		}
 	}
 
-	return em
+	return eml
 }
 
 //ValError exported

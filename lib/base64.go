@@ -3,8 +3,9 @@ package lib
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"strings"
+
+	"github.com/zicare/go-rpg/msg"
 )
 
 //Encode exported
@@ -22,8 +23,8 @@ func Decode(src string) (string, error) {
 	}
 	decoded, err := base64.URLEncoding.DecodeString(src)
 	if err != nil {
-		errMsg := fmt.Errorf("Decoding Error %s", err)
-		return "", errMsg
+		//Decoding Error %s
+		return "", msg.Get("17").SetArgs(err.Error()).M2E()
 	}
 	return string(decoded), nil
 }

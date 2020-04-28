@@ -1,13 +1,13 @@
 package acl
 
 import (
-	"errors"
 	"reflect"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/zicare/go-rpg/db"
 	"github.com/zicare/go-rpg/lib"
+	"github.com/zicare/go-rpg/msg"
 )
 
 var acl map[Grant]lib.TimeRange
@@ -69,7 +69,8 @@ func Init(m db.Model) (err error) {
 
 	for _, col := range f {
 		if col == "" {
-			return errors.New(("ACL tags are not properly set"))
+			//ACL tags are not properly set
+			return msg.Get("2").M2E()
 		}
 	}
 
@@ -90,14 +91,16 @@ func Init(m db.Model) (err error) {
 	for rows.Next() {
 		err := rows.Scan(&role, &route, &method, &from, &to)
 		if err != nil {
-			return err
+			//Server error: %s
+			return msg.Get("25").SetArgs(err).M2E()
 		}
 		g = Grant{RoleID: role, Route: route, Method: method}
 		acl[g] = lib.TimeRange{From: from, To: to}
 	}
 	err = rows.Err()
 	if err != nil {
-		return err
+		//Server error: %s
+		return msg.Get("25").SetArgs(err).M2E()
 	}
 
 	//Initialize DeleteUsersMap

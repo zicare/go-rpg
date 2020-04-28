@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zicare/go-rpg/msg"
+
 	"github.com/gin-gonic/gin"
 	sqlbuilder "github.com/huandu/go-sqlbuilder"
 	"golang.org/x/crypto/bcrypt"
@@ -35,7 +37,7 @@ func BasicAuth(m User) gin.HandlerFunc {
 
 		email, password, ok := c.Request.BasicAuth()
 		if ok == false {
-			abort(c, 401, "HTTP basic authentication required")
+			abort(c, 401, msg.Get("3")) //HTTP basic authentication required
 			return
 		}
 
@@ -59,7 +61,7 @@ func BasicAuth(m User) gin.HandlerFunc {
 		err := db.Db().QueryRow(sql, args...).Scan(ms.Addr(&m)...)
 		if err != nil {
 			//email not registered
-			abort(c, 401, "Invalid credentials")
+			abort(c, 401, msg.Get("4")) //Invalid credentials
 			return
 		}
 
@@ -75,16 +77,16 @@ func BasicAuth(m User) gin.HandlerFunc {
 			//fmt.Println("pwd okay")
 		case bcrypt.ErrMismatchedHashAndPassword:
 			//log.Println("Invalid password")
-			abort(c, 401, "Invalid credentials")
+			abort(c, 401, msg.Get("4")) //Invalid credentials
 			return
 		default:
 			//log.Println("Something went wrong")
-			abort(c, 500, "Something went wrong verifying your credentials")
+			abort(c, 500, msg.Get("5")) //Something went wrong verifying your credentials
 			return
 		}
 
 		if now.Before(m.GetSystemAccessFrom()) || now.After(m.GetSystemAccessTo()) {
-			abort(c, 401, "Credentials expired or not yet valid")
+			abort(c, 401, msg.Get("6")) //Credentials expired or not yet valid
 			return
 		}
 
@@ -108,14 +110,14 @@ func Auth(route string) gin.HandlerFunc {
 
 		token := strings.Split(c.GetHeader("Authorization"), " ")
 		if (len(token) != 2) || (token[0] != "JWT") {
-			abort(c, 401, "JWT authorization header malformed")
+			abort(c, 401, msg.Get("7")) //JWT authorization header malformed
 			return
 		}
 
-		var err error
-		auth, err = JwtAuth(token[1], secret)
-		if err != nil {
-			abort(c, 401, err.Error())
+		var e *msg.Message
+		auth, e = JwtAuth(token[1], secret)
+		if e != nil {
+			abort(c, 401, *e)
 			return
 		}
 
@@ -123,23 +125,23 @@ func Auth(route string) gin.HandlerFunc {
 		g := Grant{RoleID: auth.RoleID, Route: route, Method: c.Request.Method}
 		r, ok := a[g]
 		if !ok {
-			abort(c, 401, "Not enough permissions")
+			abort(c, 401, msg.Get("8")) //Not enough permissions
 			return
 		}
 
 		now := time.Now()
 		if now.Before(r.From) || now.After(r.To) {
-			abort(c, 401, "Role access expired or not yet valid")
+			abort(c, 401, msg.Get("9")) //Role access expired or not yet valid
 			return
 		}
 
 		if tps.IsEnabled() && tps.Transaction(auth.UserID, auth.TPS) != nil {
-			abort(c, 401, "TPS limit exceeded")
+			abort(c, 401, msg.Get("10")) //TPS limit exceeded
 			return
 		}
 
 		if _, ok := DeletedUsersMap[auth.UserID]; ok {
-			abort(c, 401, "Unauthorized")
+			abort(c, 401, msg.Get("11")) //Unauthorized
 			return
 		}
 
@@ -148,7 +150,7 @@ func Auth(route string) gin.HandlerFunc {
 	}
 }
 
-func abort(c *gin.Context, code int, msg string) {
+func abort(c *gin.Context, code int, msg msg.Message) {
 
 	c.JSON(
 		code,

@@ -5,11 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/zicare/go-rpg/lib"
+	"github.com/zicare/go-rpg/msg"
 )
 
 type jwt struct {
@@ -67,33 +67,38 @@ func JwtToken(u User, duration time.Duration, secret string) (string, string) {
 }
 
 //JwtAuth exported
-func JwtAuth(token string, secret string) (JwtPayload, error) {
+func JwtAuth(token string, secret string) (JwtPayload, *msg.Message) {
 
 	var payload JwtPayload
 
 	t := strings.Split(token, ".")
 	if len(t) != 3 {
-		return payload, errors.New("Invalid token")
+		//Invalid token
+		return payload, msg.Get("12").M2E()
 	}
 
 	decodedPayload, PayloadErr := lib.Decode(t[1])
 	if PayloadErr != nil {
-		return payload, errors.New("Invalid payload")
+		//Invalid payload
+		return payload, msg.Get("13").M2E()
 	}
 
 	ParseErr := json.Unmarshal([]byte(decodedPayload), &payload)
 	if ParseErr != nil {
-		return payload, errors.New("Invalid payload")
+		//Invalid payload
+		return payload, msg.Get("13").M2E()
 	}
 
 	j := new(payload, secret)
 
 	if token != j.token {
-		return payload, errors.New("Token tampered")
+		//Token tampered
+		return payload, msg.Get("14").M2E()
 	}
 
 	if j.payload.Expiration < time.Now().Unix() {
-		return payload, errors.New("Token expired")
+		//Token expired
+		return payload, msg.Get("15").M2E()
 	}
 
 	return payload, nil

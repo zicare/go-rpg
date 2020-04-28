@@ -1,12 +1,11 @@
 package db
 
 import (
-	"errors"
-
 	"github.com/gin-gonic/gin"
 	"github.com/huandu/go-sqlbuilder"
 
 	"github.com/zicare/go-rpg/lib"
+	"github.com/zicare/go-rpg/msg"
 	"gopkg.in/go-playground/validator.v8"
 )
 
@@ -20,7 +19,8 @@ func (ReadOnlyModel) Table() string {
 
 //Bind exported
 func (ReadOnlyModel) Bind(c *gin.Context, pIDs []lib.Pair) error {
-	return errors.New("Read only model")
+	//Read only model
+	return msg.Get("16").M2E()
 }
 
 //Validation exported
@@ -28,7 +28,8 @@ func (ReadOnlyModel) Validation(v *validator.Validate, sl *validator.StructLevel
 
 //Delete exported
 func (ReadOnlyModel) Delete(c *gin.Context, pIDs []lib.Pair) error {
-	return errors.New("Read only model")
+	//Read only model
+	return msg.Get("16").M2E()
 }
 
 //Scope exported

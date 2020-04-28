@@ -1,8 +1,9 @@
 package tps
 
 import (
-	"errors"
 	"time"
+
+	"github.com/zicare/go-rpg/msg"
 )
 
 //IsEnabled exported
@@ -17,9 +18,11 @@ func IsEnabled() bool {
 func Init(chcap int, mapcln time.Duration) error {
 
 	if chcap < 3 {
-		return errors.New("A minimum of 3 calls/chcap required to calculate TPS")
+		//A minimum of %s calls/chcap required to calculate TPS
+		return msg.Get("20").SetArgs(3).M2E()
 	} else if mapcln < 5 {
-		return errors.New("TPS data clean up cycles must be 5 seconds or longer")
+		//TPS data clean up cycles must be %s seconds or longer
+		return msg.Get("21").SetArgs(5).M2E()
 	} else {
 		n = chcap
 		mcl = mapcln

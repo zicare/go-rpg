@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zicare/go-rpg/msg"
+
 	"github.com/gin-gonic/gin"
 	"github.com/huandu/go-sqlbuilder"
 
@@ -49,43 +51,71 @@ type Model interface {
 }
 
 //NotFoundError exported
-type NotFoundError struct {
-	MSG string
-}
+type NotFoundError msg.Message
 
 //Error exported
 func (e *NotFoundError) Error() string {
-	return e.MSG
+	return e.Error()
+}
+
+//Copy exported
+func (e *NotFoundError) Copy(m msg.Message) {
+
+	e.Key = m.Key
+	e.Msg = m.Msg
+	e.Args = m.Args
+	e.Field = m.Field
 }
 
 //NotAllowedError exported
-type NotAllowedError struct {
-	MSG string
-}
+type NotAllowedError msg.Message
 
 //Error exported
 func (e *NotAllowedError) Error() string {
-	return e.MSG
+	return e.Error()
+}
+
+//Copy exported
+func (e *NotAllowedError) Copy(m msg.Message) {
+
+	e.Key = m.Key
+	e.Msg = m.Msg
+	e.Args = m.Args
+	e.Field = m.Field
 }
 
 //ConflictError exported
-type ConflictError struct {
-	MSG string
-}
+type ConflictError msg.Message
 
 //Error exported
 func (e *ConflictError) Error() string {
-	return e.MSG
+	return e.Error()
+}
+
+//Copy exported
+func (e *ConflictError) Copy(m msg.Message) {
+
+	e.Key = m.Key
+	e.Msg = m.Msg
+	e.Args = m.Args
+	e.Field = m.Field
 }
 
 //ParamError exported
-type ParamError struct {
-	MSG string
-}
+type ParamError msg.Message
 
 //Error exported
 func (e *ParamError) Error() string {
-	return e.MSG
+	return e.Error()
+}
+
+//Copy exported
+func (e *ParamError) Copy(m msg.Message) {
+
+	e.Key = m.Key
+	e.Msg = m.Msg
+	e.Args = m.Args
+	e.Field = m.Field
 }
 
 /*
@@ -228,10 +258,11 @@ func Cols(m Model) (cols map[string]interface{}, colsOrdered []string, pk []stri
 var db *sql.DB
 
 //Init tests the db connection and saves the db handler
-func Init() (err error) {
+func Init() error {
 
 	var (
-		c = config.Config()
+		err error
+		c   = config.Config()
 		//conn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
 		conn = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 			c.GetString("db.user"),
@@ -244,17 +275,19 @@ func Init() (err error) {
 	//db, err = sql.Open("mysql", conn)
 	db, err = sql.Open("postgres", conn)
 	if err != nil {
-		return
+		//Server error: %s
+		return msg.Get("25").SetArgs(err.Error()).M2E()
 	}
 
 	err = db.Ping()
 	if err != nil {
-		return
+		//Server error: %s
+		return msg.Get("25").SetArgs(err.Error()).M2E()
 	}
 
 	db.SetMaxOpenConns(c.GetInt("db.max_open_conns"))
 
-	return
+	return nil
 }
 
 //Db returns the db handler

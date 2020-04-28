@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zicare/go-rpg/msg"
 	"github.com/zicare/go-rpg/slice"
 
 	"github.com/zicare/go-rpg/config"
@@ -23,7 +24,7 @@ func ParamIDs(c *gin.Context, m Model) ([]lib.Pair, error) {
 
 	if len(pkParam) != len(fields.Primary) {
 		e := new(ParamError)
-		e.MSG = "Composite key missuse"
+		e.Copy(msg.Get("26")) //Composite key missuse
 		return mIDs, e
 	}
 
