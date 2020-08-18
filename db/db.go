@@ -43,7 +43,7 @@ type Model interface {
 	Table() string
 	View() string
 	Val() interface{}
-	Xfrm() Model
+	Xfrm(*gin.Context) Model
 	Bind(*gin.Context, []lib.Pair) error
 	Validation(*validator.Validate, *validator.StructLevel)
 	Delete(*gin.Context, []lib.Pair) error
@@ -144,7 +144,7 @@ func (e *ParamError) Copy(m msg.Message) {
  * }
  *
  *
- * func (person *Person) Xfrm() db.Model { //make changes to person before sending the output on GET/HEAD requests
+ * func (person *Person) Xfrm(c *gin.Context) db.Model { //make changes to person before sending the output on GET/HEAD requests
  * 	return person
  * }
  *

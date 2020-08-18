@@ -91,7 +91,7 @@ func (ctrl Controller) Get(c *gin.Context, m db.Model) {
 			)
 		}
 	} else {
-		c.JSON(http.StatusOK, m.Xfrm())
+		c.JSON(http.StatusOK, m.Xfrm(c))
 	}
 }
 
@@ -123,7 +123,7 @@ func (ctrl *Controller) Post(c *gin.Context, m db.Model) {
 			)
 		}
 	} else {
-		c.JSON(http.StatusCreated, m.Xfrm())
+		c.JSON(http.StatusCreated, m.Xfrm(c))
 	}
 }
 
@@ -160,7 +160,7 @@ func (ctrl Controller) Put(c *gin.Context, m db.Model) {
 			)
 		}
 	} else {
-		c.JSON(http.StatusOK, m.Xfrm())
+		c.JSON(http.StatusOK, m.Xfrm(c))
 	}
 }
 

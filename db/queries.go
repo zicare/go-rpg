@@ -116,7 +116,7 @@ func FetchAll(c *gin.Context, m Model) (ResultSetMeta, []interface{}, error) {
 			//Server error: %s
 			return meta, results, msg.Get("25").SetArgs(err.Error()).M2E()
 		}
-		results = append(results, m.Xfrm().Val())
+		results = append(results, m.Xfrm(c).Val())
 	}
 	err = rows.Err()
 	if err != nil {
