@@ -319,6 +319,11 @@ func MID(k string, v int64) []lib.Pair {
 	return []lib.Pair{{A: k, B: strconv.FormatInt(v, 10)}}
 }
 
+//MIDs exported
+func MIDs(k string, v string) []lib.Pair {
+	return []lib.Pair{{A: k, B: v}}
+}
+
 //TAG exported
 func TAG(m Model, tag string) (out map[string]string) {
 
